@@ -1,8 +1,10 @@
-mod config;
+use public_appservice::*; 
+
 use config::Config;
 
-mod appservice;
 use appservice::Client;
+
+use server::Server;
 
 use ruma::{
     api::client::{account::whoami, membership::joined_rooms, message::send_message_event},
@@ -19,6 +21,7 @@ struct AppService {
 
 #[tokio::main]
 async fn main() {
+
     // Read config
     let config = Config::new();
 
@@ -43,6 +46,13 @@ async fn main() {
 
     if let Some(room_states) = client.joined_rooms_state().await {
         println!("States: {:#?}", room_states.len());
+    }
+
+    let server = Server::new(config.clone());
+
+    if let Err(e) = server.run(config.appservice.port.clone()).await {
+        eprintln!("Server error: {}", e);
+        std::process::exit(1);
     }
 
 }

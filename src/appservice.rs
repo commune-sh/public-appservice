@@ -1,4 +1,3 @@
-use std::error;
 use crate::config::Config;
 
 use ruma::{
@@ -12,6 +11,7 @@ pub type HttpClient = ruma::client::http_client::HyperNativeTls;
 pub struct Client {
     client: ruma::Client<HttpClient>,
 }
+
 
 type RoomState = Vec<ruma::serde::Raw<AnyStateEvent>>;
 

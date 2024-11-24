@@ -1,14 +1,14 @@
-use serde::Deserialize;
+use serde::{Serialize, Deserialize};
 use std::{fs, process};
 
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
     pub appservice: AppService,
     pub matrix: Matrix,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppService {
     pub port: u16,
     pub id: String,
@@ -18,14 +18,14 @@ pub struct AppService {
     pub rules: AppServiceRules,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppServiceRules {
     pub auto_join: bool,
     pub invite_by_local_user: bool,
     pub federation_domain_whitelist: Vec<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Matrix {
     pub homeserver: String,
     pub server_name: String,
