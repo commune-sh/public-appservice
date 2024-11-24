@@ -37,13 +37,14 @@ async fn main() {
         }
     }
 
-    /*
-    let rooms = client
-        .send_request(joined_rooms::v3::Request::new())
-        .await;
+    if let Some(rooms) = client.joined_rooms().await {
+        println!("Joined rooms: {:#?}", rooms);
+        println!("Joined rooms: {:#?}", rooms.len());
+    }
 
-    println!("Logged in as: {:#?}", client);
-    println!("Logged in as: {:#?}", rooms);
-*/
+
+    if let Some(room_states) = client.joined_rooms_state().await {
+        println!("States: {:#?}", room_states);
+    }
 
 }
