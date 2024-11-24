@@ -22,7 +22,6 @@ async fn main() {
     // Read config
     let config = Config::new();
 
-    config.print();
 
     let client = Client::new(&config).await.unwrap();
 
@@ -38,13 +37,12 @@ async fn main() {
     }
 
     if let Some(rooms) = client.joined_rooms().await {
-        println!("Joined rooms: {:#?}", rooms);
         println!("Joined rooms: {:#?}", rooms.len());
     }
 
 
     if let Some(room_states) = client.joined_rooms_state().await {
-        println!("States: {:#?}", room_states);
+        println!("States: {:#?}", room_states.len());
     }
 
 }

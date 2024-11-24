@@ -3,7 +3,7 @@ use crate::config::Config;
 
 use ruma::{
     api::client::{account::whoami, membership::joined_rooms, state::get_state_events },
-    events::AnyStateEvent,
+    events::AnyStateEvent, 
 };
 use anyhow;
 
@@ -66,6 +66,33 @@ impl Client {
                 ))
                 .await
                 .ok()?;
+
+
+            for state_event in &st.room_state {
+
+                if state_event.get_field::<String>("type").ok()?.as_deref() == Some("m.room.create") {
+                    let event = state_event.deserialize_as::<AnyStateEvent>().ok()?;
+
+                    match event {
+                        AnyStateEvent::RoomCreate(event) => {
+                            println!("Event: {:#?}", event);
+                        }
+                        _ => {
+                            println!("Unknown event: {:#?}", event);
+                        }
+                    }
+                }
+
+                /*
+
+                if let Ok(Some(event)) = state_event.get_field::<String>("type") {
+                    println!("Event type: {}", event);
+                }
+*/
+
+
+            }
+
 
             rooms_state.push(st.room_state);
         }
