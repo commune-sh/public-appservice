@@ -112,7 +112,8 @@ impl Server {
 
         let room_routes = Router::new()
             .nest("/:room_id", room_routes_inner)
-            .route_layer(middleware::from_fn_with_state(state.clone(), validate_room))
+            .route_layer(middleware::from_fn_with_state(state.clone(), validate_public_room))
+            .route_layer(middleware::from_fn_with_state(state.clone(), validate_room_id))
             .with_state(state.clone());
 
         let app = Router::new()
@@ -303,17 +304,33 @@ pub fn extract_token(header: &str) -> Option<&str> {
         None
     }
 }
-async fn validate_room(
+async fn validate_room_id(
     //Path(room_id): Path<String>,
+    Path(params): Path<Vec<(String, String)>>,
+    State(state): State<Arc<AppState>>,
+    mut req: Request<Body>,
+    next: Next,
+) -> Result<impl IntoResponse, (StatusCode, Json<Value>)> {
+
+    let room_id = params[0].1.clone();
+    println!("Validating room: {:#?}", room_id);
+
+    req.extensions_mut().insert(room_id);
+
+    Ok(next.run(req).await)
+}
+
+async fn validate_public_room(
+    //Path(room_id): Path<String>,
+    Extension(data): Extension<String>,
     Path(params): Path<Vec<(String, String)>>,
     State(state): State<Arc<AppState>>,
     req: Request<Body>,
     next: Next,
 ) -> Result<impl IntoResponse, (StatusCode, Json<Value>)> {
 
-    let room_id = params[0].1.clone();
+    println!("passed down room id is: {:#?}", data);
 
-    println!("Validating room: {:#?}", room_id);
     Ok(next.run(req).await)
 }
 
