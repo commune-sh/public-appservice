@@ -20,7 +20,9 @@ use hyper_util::{client::legacy::connect::HttpConnector, rt::TokioExecutor};
 type Client = hyper_util::client::legacy::Client<HttpConnector, Body>;
 
 use ruma::{
-    events::{room::member::RoomMemberEvent},
+    events::{
+        room::member::{RoomMemberEvent, MembershipState},
+    },
     serde::Raw,
 };
 
@@ -151,7 +153,26 @@ async fn transactions(
             //
             let room_id = event.room_id().to_owned();
 
-            state.appservice.join_room(room_id).await;
+            let membership = event.membership().to_owned();
+
+            println!("membership: {:#?}", membership);
+
+            match membership {
+                MembershipState::Leave => {
+                    println!("Leaving room: {}", room_id);
+                }
+                MembershipState::Ban => {
+                    println!("Banning user from room: {}", room_id);
+                    state.appservice.leave_room(room_id).await;
+                }
+                MembershipState::Invite => {
+                    println!("Joining room: {}", room_id);
+                    state.appservice.join_room(room_id).await;
+                }
+                _ => {}
+            }
+
+
         }
     }
 

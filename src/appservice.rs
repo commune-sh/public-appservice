@@ -5,10 +5,10 @@ use ruma::{
         account::whoami, 
         membership::joined_rooms, 
         state::get_state_events,
-        membership::join_room_by_id
+        membership::{join_room_by_id, leave_room}
     },
     events::AnyStateEvent, 
-    RoomId,OwnedRoomId
+    OwnedRoomId
 };
 
 
@@ -54,6 +54,17 @@ impl AppService {
             .await
             .ok();
         println!("Join room: {:#?}", jr);
+    }
+
+    pub async fn leave_room(&self, room_id: OwnedRoomId) {
+
+        let jr = self.client
+            .send_request(leave_room::v3::Request::new(
+                room_id
+            ))
+            .await
+            .ok();
+        println!("Left room: {:#?}", jr);
     }
 
 
