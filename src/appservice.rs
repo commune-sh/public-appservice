@@ -1,21 +1,31 @@
 use crate::config::Config;
 
 use ruma::{
-    api::client::{account::whoami, membership::joined_rooms, state::get_state_events },
+    api::client::{
+        account::whoami, 
+        membership::joined_rooms, 
+        state::get_state_events,
+        membership::join_room_by_id
+    },
     events::AnyStateEvent, 
+    RoomId,OwnedRoomId
 };
+
+
+
 use anyhow;
 
 pub type HttpClient = ruma::client::http_client::HyperNativeTls;
 
-pub struct Client {
+#[derive(Clone)]
+pub struct AppService {
     client: ruma::Client<HttpClient>,
 }
 
 
 type RoomState = Vec<ruma::serde::Raw<AnyStateEvent>>;
 
-impl Client {
+impl AppService {
     pub async fn new(config: &Config) -> Result<Self, anyhow::Error> {
 
         let client = ruma::Client::builder()
@@ -34,6 +44,18 @@ impl Client {
             .await
             .ok()
     }
+
+    pub async fn join_room(&self, room_id: OwnedRoomId) {
+
+        let jr = self.client
+            .send_request(join_room_by_id::v3::Request::new(
+                room_id
+            ))
+            .await
+            .ok();
+        println!("Join room: {:#?}", jr);
+    }
+
 
     pub async fn joined_rooms(&self) -> Option<Vec<ruma::OwnedRoomId>> {
 

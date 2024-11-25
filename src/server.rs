@@ -26,14 +26,18 @@ use ruma::{
 
 
 
+
 use anyhow;
 
 
 use crate::config::Config;
 
+use crate::appservice::AppService;
+
 #[warn(dead_code)]
 pub struct Server {
     config: Config,
+    appservice: AppService,
 }
 
 
@@ -41,11 +45,12 @@ pub struct Server {
 struct AppState {
     config: Config,
     client: Client,
+    appservice: AppService,
 }
 
 impl Server {
-    pub fn new(config: Config) -> Self {
-        Self { config }
+    pub fn new(config: Config, appservice: AppService) -> Self {
+        Self { config, appservice }
     }
 
     pub async fn run(&self, port: u16) -> Result<(), anyhow::Error> {
@@ -56,7 +61,8 @@ impl Server {
 
         let state = Arc::new(AppState {
             config: self.config.clone(),
-            client
+            client,
+            appservice: self.appservice.clone(),
         });
 
         let login_routes = Router::new()
@@ -142,7 +148,10 @@ async fn transactions(
 
         if let Ok(event) =  serde_json::from_value::<RoomMemberEvent>(event.clone()) {
             // Handle the deserialized event
-            println!("Invite received: {:?}", event);
+            //
+            let room_id = event.room_id().to_owned();
+
+            state.appservice.join_room(room_id).await;
         }
     }
 

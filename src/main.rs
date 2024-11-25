@@ -2,7 +2,7 @@ use public_appservice::*;
 
 use config::Config;
 
-use appservice::Client;
+use appservice::AppService;
 
 use server::Server;
 
@@ -14,11 +14,6 @@ use ruma::{
 
 type HttpClient = ruma::client::http_client::HyperNativeTls;
 
-struct AppService {
-    config: Config,
-    client: ruma::Client<HttpClient>,
-}
-
 #[tokio::main]
 async fn main() {
 
@@ -26,9 +21,9 @@ async fn main() {
     let config = Config::new();
 
 
-    let client = Client::new(&config).await.unwrap();
+    let appservice = AppService::new(&config).await.unwrap();
 
-    let whoami = client.whoami().await;
+    let whoami = appservice.whoami().await;
 
     match whoami {
         Some(whoami) => {
@@ -39,16 +34,16 @@ async fn main() {
         }
     }
 
-    if let Some(rooms) = client.joined_rooms().await {
+    if let Some(rooms) = appservice.joined_rooms().await {
         println!("Joined rooms: {:#?}", rooms.len());
     }
 
 
-    if let Some(room_states) = client.joined_rooms_state().await {
+    if let Some(room_states) = appservice.joined_rooms_state().await {
         println!("States: {:#?}", room_states.len());
     }
 
-    let server = Server::new(config.clone());
+    let server = Server::new(config.clone(), appservice.clone());
 
     if let Err(e) = server.run(config.appservice.port.clone()).await {
         eprintln!("Server error: {}", e);
