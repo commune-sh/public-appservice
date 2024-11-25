@@ -202,64 +202,38 @@ async fn proxy_handler(
         .into_response())
 }
 
-pub fn extract_token(auth_header: Option<&str>) -> Option<&str> {
-    auth_header.and_then(|header| {
-        if header.starts_with("Bearer ") {
-            Some(header.trim_start_matches("Bearer ").trim())
-        } else {
-            None
-        }
-    })
+pub fn extract_token(header: &str) -> Option<&str> {
+    if header.starts_with("Bearer ") {
+        Some(header.trim_start_matches("Bearer ").trim())
+    } else {
+        None
+    }
 }
 
 async fn authenticate_homeserver(
     State(state): State<Arc<AppState>>,
     req: Request<Body>,
     next: Next,
-) -> Result<Response<Body>, StatusCode> {
+) -> Result<impl IntoResponse, (StatusCode, Json<Value>)> {
 
-    // access authorization header
-    let auth_header = req
+    if let Some(auth_header) = req
         .headers()
         .get(AUTHORIZATION)
-        .and_then(|h| h.to_str().ok());
-
-    let token = match extract_token(auth_header) {
-        Some(token) => token,
-        None => {
-
-            let rmerr = RumaError::new(
-                StatusCode::UNAUTHORIZED,
-                ErrorBody::Standard {
-                    kind: ErrorKind::Unauthorized,
-                    message: "Missing access token".to_string(),
-                },
-            );
-            println!("Error: {:?}", rmerr);
-
-
-            return Ok((
-                StatusCode::FORBIDDEN,
-                Json(json!({
-                    "errcode": "BAD_ACCESS_TOKEN",
-                    "error": "access token invalid"
-                }))
-            ).into_response());
+        .and_then(|h| h.to_str().ok()) {
+        if let Some(token) = extract_token(auth_header) {
+            if token == &state.config.appservice.hs_access_token {
+                return Ok(next.run(req).await)
+            }
         }
     };
 
-    // Check if token matches config
-    if token != &state.config.appservice.hs_access_token {
-        return Ok((
-            StatusCode::FORBIDDEN,
-            Json(json!({
-                "errcode": "BAD_ACCESS_TOKEN",
-                "error": "access token invalid"
-            }))
-        ).into_response());
-    }
-
-    Ok(next.run(req).await)
+    Err((
+        StatusCode::UNAUTHORIZED,
+        Json(json!({
+            "errcode": "BAD_ACCESS_TOKEN",
+            "error": "access token invalid"
+        }))
+    ))
 }
 
 

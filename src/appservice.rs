@@ -68,6 +68,7 @@ impl Client {
                 .ok()?;
 
 
+            /*
             for state_event in &st.room_state {
 
                 if state_event.get_field::<String>("type").ok()?.as_deref() == Some("m.room.create") {
@@ -92,6 +93,7 @@ impl Client {
 
 
             }
+*/
 
 
             rooms_state.push(st.room_state);
