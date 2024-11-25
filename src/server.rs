@@ -1,10 +1,10 @@
 use axum::{
     body::Body,
-    extract::{State, OriginalUri},
+    extract::{Path, State, OriginalUri},
     http::{Request, Response, StatusCode, Uri, HeaderValue, header::AUTHORIZATION},
     middleware::{self, Next},
     response::IntoResponse,
-    routing::{get, post, any},
+    routing::{get, post, put, any},
     Json,
     Router,
     Extension
@@ -19,8 +19,10 @@ use hyper_util::{client::legacy::connect::HttpConnector, rt::TokioExecutor};
 
 type Client = hyper_util::client::legacy::Client<HttpConnector, Body>;
 
-use ruma::api::client::error::{Error as RumaError, ErrorBody, ErrorKind};
-
+use ruma::{
+    events::{room::member::RoomMemberEvent},
+    serde::Raw,
+};
 
 
 
@@ -87,7 +89,8 @@ impl Server {
 
         let service_routes = Router::new()
             //.layer(Extension(state.clone()))
-            .route("/ping",get(ping))
+            .route("/ping", get(ping))
+            .route("/transactions/:txn_id", put(transactions))
             .route_layer(middleware::from_fn_with_state(state.clone(), authenticate_homeserver))
             .with_state(state.clone());
 
@@ -114,6 +117,37 @@ impl Server {
 
         Ok(())
     }
+}
+
+async fn transactions(
+    Path(txn_id): Path<String>,
+    State(state): State<Arc<AppState>>,
+    Json(payload): Json<Value>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    println!("Transaction ID is : {}", txn_id);
+
+
+    let events = match payload.get("events") {
+        Some(Value::Array(events)) => events,
+        Some(_) | None => {
+            println!("Events is not an array");
+            return Ok(Json(serde_json::json!({})))
+        }
+    };
+
+
+    // iterate over events
+    for event in events {
+        println!("Event: {:#?}", event);
+
+        if let Ok(event) =  serde_json::from_value::<RoomMemberEvent>(event.clone()) {
+            // Handle the deserialized event
+            println!("Invite received: {:?}", event);
+        }
+    }
+
+
+    Ok(Json(serde_json::json!({})))
 }
 
 async fn login_get_middleware(
