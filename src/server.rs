@@ -5,8 +5,12 @@ use axum::{
     middleware::{self, Next},
     response::IntoResponse,
     routing::{get, post, any},
+    Json,
     Router,
+    Extension
 };
+
+use serde_json::{json, Value};
 
 use std::sync::Arc;
 use tracing::info;
@@ -14,6 +18,9 @@ use tracing::info;
 use hyper_util::{client::legacy::connect::HttpConnector, rt::TokioExecutor};
 
 type Client = hyper_util::client::legacy::Client<HttpConnector, Body>;
+
+use ruma::api::client::error::{Error as RumaError, ErrorBody, ErrorKind};
+
 
 
 
@@ -78,7 +85,14 @@ impl Server {
             .with_state(state.clone());
 
 
+        let service_routes = Router::new()
+            //.layer(Extension(state.clone()))
+            .route("/ping",get(ping))
+            .route_layer(middleware::from_fn_with_state(state.clone(), authenticate_homeserver))
+            .with_state(state.clone());
+
         let app = Router::new()
+            .nest("/_matrix/app/v1", service_routes)
             .nest("/_matrix/client/v3/login", login_routes)
             .nest("/_matrix/client/v3/register", register_routes)
             .fallback(any(proxy_handler))
@@ -188,6 +202,67 @@ async fn proxy_handler(
         .into_response())
 }
 
+pub fn extract_token(auth_header: Option<&str>) -> Option<&str> {
+    auth_header.and_then(|header| {
+        if header.starts_with("Bearer ") {
+            Some(header.trim_start_matches("Bearer ").trim())
+        } else {
+            None
+        }
+    })
+}
+
+async fn authenticate_homeserver(
+    State(state): State<Arc<AppState>>,
+    req: Request<Body>,
+    next: Next,
+) -> Result<Response<Body>, StatusCode> {
+
+    // access authorization header
+    let auth_header = req
+        .headers()
+        .get(AUTHORIZATION)
+        .and_then(|h| h.to_str().ok());
+
+    let token = match extract_token(auth_header) {
+        Some(token) => token,
+        None => {
+
+            let rmerr = RumaError::new(
+                StatusCode::UNAUTHORIZED,
+                ErrorBody::Standard {
+                    kind: ErrorKind::Unauthorized,
+                    message: "Missing access token".to_string(),
+                },
+            );
+            println!("Error: {:?}", rmerr);
+
+
+            return Ok((
+                StatusCode::FORBIDDEN,
+                Json(json!({
+                    "errcode": "BAD_ACCESS_TOKEN",
+                    "error": "access token invalid"
+                }))
+            ).into_response());
+        }
+    };
+
+    // Check if token matches config
+    if token != &state.config.appservice.hs_access_token {
+        return Ok((
+            StatusCode::FORBIDDEN,
+            Json(json!({
+                "errcode": "BAD_ACCESS_TOKEN",
+                "error": "access token invalid"
+            }))
+        ).into_response());
+    }
+
+    Ok(next.run(req).await)
+}
+
+
 async fn request_middleware(
     req: Request<Body>,
     next: Next,
@@ -214,4 +289,12 @@ async fn index() -> &'static str {
 
 async fn login() -> &'static str {
     "Login\n"
+}
+
+async fn ping(
+    State(state): State<Arc<AppState>>,
+) -> &'static str {
+    let homeserver = &state.config.matrix.homeserver;
+    println!("Pinging Homeserver: {}", homeserver);
+    "Ping\n"
 }
