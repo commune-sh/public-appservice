@@ -132,8 +132,6 @@ async fn transactions(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<Value>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
-    println!("Transaction ID is : {}", txn_id);
-
 
     let events = match payload.get("events") {
         Some(Value::Array(events)) => events,
@@ -144,18 +142,20 @@ async fn transactions(
     };
 
 
-    // iterate over events
     for event in events {
         println!("Event: {:#?}", event);
 
         if let Ok(event) =  serde_json::from_value::<RoomMemberEvent>(event.clone()) {
-            // Handle the deserialized event
-            //
             let room_id = event.room_id().to_owned();
 
             let membership = event.membership().to_owned();
 
-            println!("membership: {:#?}", membership);
+            // Ignore membership events for other users
+            let invited_user = event.state_key().to_owned();
+            if invited_user != state.appservice.user_id {
+                info!("Ignoring event for user: {}", invited_user);
+                continue;
+            }
 
             match membership {
                 MembershipState::Leave => {

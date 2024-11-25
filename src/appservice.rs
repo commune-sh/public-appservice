@@ -20,6 +20,7 @@ pub type HttpClient = ruma::client::http_client::HyperNativeTls;
 #[derive(Clone)]
 pub struct AppService {
     client: ruma::Client<HttpClient>,
+    pub user_id: String,
 }
 
 
@@ -35,7 +36,9 @@ impl AppService {
             .await
             .unwrap();
 
-        Ok(Self { client })
+        let user_id = format!("@{}:{}", config.appservice.sender_localpart, config.matrix.server_name);
+
+        Ok(Self { client, user_id })
     }
 
     pub async fn whoami(&self) -> Option<whoami::v3::Response> {
