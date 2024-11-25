@@ -102,10 +102,20 @@ impl Server {
             .route_layer(middleware::from_fn_with_state(state.clone(), authenticate_homeserver))
             .with_state(state.clone());
 
+        let room_routes = Router::new()
+            .route("/joined_members", get(proxy_handler))
+            .route("/aliases", get(proxy_handler))
+            .route("/event/*path", get(proxy_handler))
+            .route("/context/*path", get(proxy_handler))
+            .route("/timestamp_to_event", get(proxy_handler))
+            .route_layer(middleware::from_fn_with_state(state.clone(), validate_room))
+            .with_state(state.clone());
+
         let app = Router::new()
             .nest("/_matrix/app/v1", service_routes)
             .nest("/_matrix/client/v3/login", login_routes)
             .nest("/_matrix/client/v3/register", register_routes)
+            .nest("/_matrix/client/v3/rooms/:room_id", room_routes)
             .fallback(any(proxy_handler))
             .route("/", get(index))
             .layer(middleware::from_fn(request_middleware))
@@ -289,6 +299,16 @@ pub fn extract_token(header: &str) -> Option<&str> {
         None
     }
 }
+async fn validate_room(
+    State(state): State<Arc<AppState>>,
+    req: Request<Body>,
+    next: Next,
+) -> Result<impl IntoResponse, (StatusCode, Json<Value>)> {
+
+    println!("Validating room");
+    Ok(next.run(req).await)
+}
+
 
 async fn authenticate_homeserver(
     State(state): State<Arc<AppState>>,
