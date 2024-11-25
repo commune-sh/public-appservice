@@ -102,12 +102,16 @@ impl Server {
             .route_layer(middleware::from_fn_with_state(state.clone(), authenticate_homeserver))
             .with_state(state.clone());
 
-        let room_routes = Router::new()
+        let room_routes_inner = Router::new()
             .route("/joined_members", get(proxy_handler))
             .route("/aliases", get(proxy_handler))
             .route("/event/*path", get(proxy_handler))
             .route("/context/*path", get(proxy_handler))
             .route("/timestamp_to_event", get(proxy_handler))
+            .with_state(state.clone());
+
+        let room_routes = Router::new()
+            .nest("/:room_id", room_routes_inner)
             .route_layer(middleware::from_fn_with_state(state.clone(), validate_room))
             .with_state(state.clone());
 
@@ -115,7 +119,7 @@ impl Server {
             .nest("/_matrix/app/v1", service_routes)
             .nest("/_matrix/client/v3/login", login_routes)
             .nest("/_matrix/client/v3/register", register_routes)
-            .nest("/_matrix/client/v3/rooms/:room_id", room_routes)
+            .nest("/_matrix/client/v3/rooms", room_routes)
             .fallback(any(proxy_handler))
             .route("/", get(index))
             .layer(middleware::from_fn(request_middleware))
@@ -261,23 +265,23 @@ async fn proxy_handler(
         req.uri().path()
     };
 
-    println!("Path is: {}", path);
+    //println!("Path is: {}", path);
 
     let path_query = req.uri().query().map(|q| format!("?{}", q)).unwrap_or_default();
 
-    println!("Path query is: {}", path_query);
+    //println!("Path query is: {}", path_query);
 
     let homeserver = &state.config.matrix.homeserver;
 
     let uri = format!("{}{}{}", homeserver, path, path_query);
 
-    println!("Proxying request to: {}", uri);
+    //println!("Proxying request to: {}", uri);
 
     *req.uri_mut() = Uri::try_from(uri).unwrap();
 
     let access_token = &state.config.appservice.access_token;
 
-    println!("Access token: {}", access_token);
+    //println!("Access token: {}", access_token);
 
     let auth_value = HeaderValue::from_str(&format!("Bearer {}", access_token))
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
@@ -300,12 +304,16 @@ pub fn extract_token(header: &str) -> Option<&str> {
     }
 }
 async fn validate_room(
+    //Path(room_id): Path<String>,
+    Path(params): Path<Vec<(String, String)>>,
     State(state): State<Arc<AppState>>,
     req: Request<Body>,
     next: Next,
 ) -> Result<impl IntoResponse, (StatusCode, Json<Value>)> {
 
-    println!("Validating room");
+    let room_id = params[0].1.clone();
+
+    println!("Validating room: {:#?}", room_id);
     Ok(next.run(req).await)
 }
 
