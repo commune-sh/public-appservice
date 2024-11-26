@@ -1,6 +1,6 @@
 use axum::{
     body::Body,
-    extract::{Path, State, OriginalUri},
+    extract::{Path, State, OriginalUri, MatchedPath},
     http::{Request, Response, StatusCode, Uri, HeaderValue, header::AUTHORIZATION},
     middleware::{self, Next},
     response::IntoResponse,
@@ -70,33 +70,6 @@ impl Server {
             appservice: self.appservice.clone(),
         });
 
-        let login_routes = Router::new()
-            .route(
-                "/",
-                get(login)
-                    .route_layer(middleware::from_fn(login_get_middleware))
-            )
-            .route(
-                "/",
-                post(proxy_handler)
-                    .route_layer(middleware::from_fn(login_post_middleware))
-            )
-            .with_state(state.clone());
-
-        // Register endpoint with method-specific middleware
-        let register_routes = Router::new()
-            .route(
-                "/",
-                get(proxy_handler)
-                    .route_layer(middleware::from_fn(register_get_middleware))
-            )
-            .route(
-                "/",
-                post(proxy_handler)
-                    .route_layer(middleware::from_fn(register_post_middleware))
-            )
-            .with_state(state.clone());
-
 
         let service_routes = Router::new()
             //.layer(Extension(state.clone()))
@@ -121,8 +94,6 @@ impl Server {
 
         let app = Router::new()
             .nest("/_matrix/app/v1", service_routes)
-            .nest("/_matrix/client/v3/login", login_routes)
-            .nest("/_matrix/client/v3/register", register_routes)
             .nest("/_matrix/client/v3/rooms", room_routes)
             .fallback(any(proxy_handler))
             .route("/", get(index))
@@ -214,62 +185,35 @@ async fn transactions(
     Ok(Json(serde_json::json!({})))
 }
 
-async fn login_get_middleware(
-    req: Request<Body>,
-    next: Next,
-) -> Result<Response<Body>, StatusCode> {
-    info!("Processing login GET request");
-    // Add login GET-specific validation, transformation, etc.
-    Ok(next.run(req).await)
-}
-
-async fn login_post_middleware(
-    req: Request<Body>,
-    next: Next,
-) -> Result<Response<Body>, StatusCode> {
-    info!("Processing login POST request");
-    // Add login POST-specific validation, transformation, etc.
-    // For example: validate login credentials format
-    Ok(next.run(req).await)
-}
-
-async fn register_get_middleware(
-    req: Request<Body>,
-    next: Next,
-) -> Result<Response<axum::body::Body>, StatusCode> {
-    info!("Processing register GET request");
-    // Add register GET-specific validation, transformation, etc.
-    Ok(next.run(req).await)
-}
-
-async fn register_post_middleware(
-    req: Request<Body>,
-    next: Next,
-) -> Result<Response<Body>, StatusCode> {
-    info!("Processing register POST request");
-    // Add register POST-specific validation, transformation, etc.
-    // For example: validate registration payload format
-    Ok(next.run(req).await)
-}
 
 async fn proxy_handler(
+    Extension(data): Extension<MiddlewareData>,
+    Path(params): Path<Vec<(String, String)>>,
     State(state): State<Arc<AppState>>,
     mut req: Request<Body>,
 ) -> Result<Response<Body>, StatusCode> {
 
+    /*
+    let room_id = params[0].1.clone();
+    println!("does room id exist here?: {}", room_id);
 
+    if let Some(room_id) = data.room_id.as_ref() {
+        println!("passed down room id is: {:#?}", room_id);
+    }
+*/
 
     //let path = req.uri().path();
-    let path = if let Some(path) = req.extensions().get::<OriginalUri>() {
-        // This will include `/api`
+    let mut path = if let Some(path) = req.extensions().get::<OriginalUri>() {
         path.0.path()
     } else {
-        // The `OriginalUri` extension will always be present if using
-        // `Router` unless another extractor or middleware has removed it
         req.uri().path()
     };
 
-    //println!("Path is: {}", path);
+    if let Some(mod_path) = data.modified_path.as_ref() {
+        path = mod_path;
+    }
+
+    println!("final Path is: {}", path);
 
     let path_query = req.uri().query().map(|q| format!("?{}", q)).unwrap_or_default();
 
@@ -307,6 +251,13 @@ pub fn extract_token(header: &str) -> Option<&str> {
         None
     }
 }
+
+#[derive(Clone)]
+struct MiddlewareData {
+    modified_path: Option<String>,
+    room_id: Option<String>,
+}
+
 async fn validate_room_id(
     //Path(room_id): Path<String>,
     Path(params): Path<Vec<(String, String)>>,
@@ -315,9 +266,14 @@ async fn validate_room_id(
     next: Next,
 ) -> Result<impl IntoResponse, (StatusCode, Json<Value>)> {
 
-    let mut room_id = params[0].1.clone();
+    let room_id = params[0].1.clone();
 
     let server_name = state.config.matrix.server_name.clone();
+
+    let mut data = MiddlewareData {
+        modified_path: None,
+        room_id: Some(room_id.clone()),
+    };
 
     if let Ok(id) = is_room_id_ok(&room_id, &server_name) {
     } else {
@@ -332,7 +288,7 @@ async fn validate_room_id(
             match id {
                 Some(id) => {
                     println!("Fetched Room ID: {:#?}", id);
-                    room_id = id.to_string();
+                    data.room_id = Some(id.to_string());
                 }
                 None => {
                     println!("Failed to get room ID from alias: {}", raw_alias);
@@ -342,21 +298,63 @@ async fn validate_room_id(
 
     }
 
-    req.extensions_mut().insert(room_id);
+    if let Some(path) = req.extensions().get::<MatchedPath>() {
+        let pattern = path.as_str();
+        
+        // Split into segments, skipping the empty first segment
+        let pattern_segments: Vec<&str> = pattern.split('/').filter(|s| !s.is_empty()).collect();
+        println!("Pattern segments: {:#?}", pattern_segments);
+
+        let fullpath = if let Some(path) = req.extensions().get::<OriginalUri>() {
+            path.0.path()
+        } else {
+            req.uri().path()
+        };
+
+        let path_segments: Vec<&str> = fullpath.split('/').filter(|s| !s.is_empty()).collect();
+        println!("Path segments: {:#?}", path_segments);
+        
+        if let Some(segment_index) = pattern_segments.iter().position(|&s| s == ":room_id") {
+            println!("Found :room_id at segment index: {}", segment_index);
+            let mut new_segments = path_segments.clone();
+            if segment_index < new_segments.len() {
+
+                new_segments[segment_index] = data.room_id.as_ref().unwrap();
+                
+                // Rebuild the path with leading slash
+                let new_path = format!("/{}", new_segments.join("/"));
+                
+                // Preserve query string if it exists
+                let new_uri = if let Some(query) = req.uri().query() {
+                    format!("{}?{}", new_path, query).parse::<Uri>().unwrap()
+                } else {
+                    new_path.parse::<Uri>().unwrap()
+                };
+                
+                println!("Modified URI: {}", new_uri);
+                data.modified_path = Some(new_uri.to_string());
+            }
+        }
+    };
+
+    req.extensions_mut().insert(data);
 
     Ok(next.run(req).await)
 }
 
+
 async fn validate_public_room(
     //Path(room_id): Path<String>,
-    Extension(data): Extension<String>,
+    Extension(data): Extension<MiddlewareData>,
     Path(params): Path<Vec<(String, String)>>,
     State(state): State<Arc<AppState>>,
     req: Request<Body>,
     next: Next,
 ) -> Result<impl IntoResponse, (StatusCode, Json<Value>)> {
 
-    println!("passed down room id is: {:#?}", data);
+    if let Some(_room_id) = data.room_id.as_ref() {
+       //println!("passed down room id is: {:#?}", room_id);
+    }
 
     Ok(next.run(req).await)
 }
@@ -411,10 +409,6 @@ async fn response_middleware(
 
 async fn index() -> &'static str {
     "Commune public appservice.\n"
-}
-
-async fn login() -> &'static str {
-    "Login\n"
 }
 
 async fn ping(
