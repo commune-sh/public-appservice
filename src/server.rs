@@ -275,15 +275,11 @@ async fn validate_room_id(
         room_id: Some(room_id.clone()),
     };
 
-    if let Ok(id) = is_room_id_ok(&room_id, &server_name) {
-    } else {
-        println!("Not a valid room id: {}", room_id);
-        println!("Check if valid alias");
+    if let Err(_) = is_room_id_ok(&room_id, &server_name) {
 
         let raw_alias = format!("#{}:{}", room_id, server_name);
 
         if let Ok(alias) = RoomAliasId::parse(&raw_alias) {
-            println!("Alias: {:#?}", alias);
             let id = state.appservice.room_id_from_alias(alias).await;
             match id {
                 Some(id) => {
@@ -296,46 +292,47 @@ async fn validate_room_id(
             }
         }
 
-    }
 
-    if let Some(path) = req.extensions().get::<MatchedPath>() {
-        let pattern = path.as_str();
-        
-        // Split into segments, skipping the empty first segment
-        let pattern_segments: Vec<&str> = pattern.split('/').filter(|s| !s.is_empty()).collect();
-        println!("Pattern segments: {:#?}", pattern_segments);
 
-        let fullpath = if let Some(path) = req.extensions().get::<OriginalUri>() {
-            path.0.path()
-        } else {
-            req.uri().path()
-        };
 
-        let path_segments: Vec<&str> = fullpath.split('/').filter(|s| !s.is_empty()).collect();
-        println!("Path segments: {:#?}", path_segments);
-        
-        if let Some(segment_index) = pattern_segments.iter().position(|&s| s == ":room_id") {
-            println!("Found :room_id at segment index: {}", segment_index);
-            let mut new_segments = path_segments.clone();
-            if segment_index < new_segments.len() {
 
-                new_segments[segment_index] = data.room_id.as_ref().unwrap();
-                
-                // Rebuild the path with leading slash
-                let new_path = format!("/{}", new_segments.join("/"));
-                
-                // Preserve query string if it exists
-                let new_uri = if let Some(query) = req.uri().query() {
-                    format!("{}?{}", new_path, query).parse::<Uri>().unwrap()
-                } else {
-                    new_path.parse::<Uri>().unwrap()
-                };
-                
-                println!("Modified URI: {}", new_uri);
-                data.modified_path = Some(new_uri.to_string());
+        if let Some(path) = req.extensions().get::<MatchedPath>() {
+            let pattern = path.as_str();
+            
+            // Split into segments, skipping the empty first segment
+            let pattern_segments: Vec<&str> = pattern.split('/').filter(|s| !s.is_empty()).collect();
+
+            let fullpath = if let Some(path) = req.extensions().get::<OriginalUri>() {
+                path.0.path()
+            } else {
+                req.uri().path()
+            };
+
+            let path_segments: Vec<&str> = fullpath.split('/').filter(|s| !s.is_empty()).collect();
+            
+            if let Some(segment_index) = pattern_segments.iter().position(|&s| s == ":room_id") {
+                println!("Found :room_id at segment index: {}", segment_index);
+                let mut new_segments = path_segments.clone();
+                if segment_index < new_segments.len() {
+
+                    new_segments[segment_index] = data.room_id.as_ref().unwrap();
+                    
+                    // Rebuild the path with leading slash
+                    let new_path = format!("/{}", new_segments.join("/"));
+                    
+                    // Preserve query string if it exists
+                    let new_uri = if let Some(query) = req.uri().query() {
+                        format!("{}?{}", new_path, query).parse::<Uri>().unwrap()
+                    } else {
+                        new_path.parse::<Uri>().unwrap()
+                    };
+                    
+                    data.modified_path = Some(new_uri.to_string());
+                }
             }
         }
-    };
+
+    }
 
     req.extensions_mut().insert(data);
 
