@@ -39,6 +39,8 @@ use crate::appservice::AppService;
 
 use crate::utils::is_room_id_ok;
 
+use crate::rooms::public_rooms;
+
 #[warn(dead_code)]
 pub struct Server {
     config: Config,
@@ -47,10 +49,10 @@ pub struct Server {
 
 
 #[derive(Clone)]
-struct AppState {
-    config: Config,
-    client: Client,
-    appservice: AppService,
+pub struct AppState {
+    pub config: Config,
+    pub client: Client,
+    pub appservice: AppService,
 }
 
 impl Server {
@@ -106,8 +108,7 @@ impl Server {
             .nest("/_matrix/client/v1/rooms/:rood_id", more_room_routes)
             .fallback(any(proxy_handler))
             .route("/", get(index))
-            .layer(middleware::from_fn(request_middleware))
-            .layer(middleware::from_fn(response_middleware))
+            .route("/publicRooms", get(public_rooms))
             .with_state(state);
 
 
@@ -262,7 +263,7 @@ pub fn extract_token(header: &str) -> Option<&str> {
 }
 
 #[derive(Clone)]
-struct MiddlewareData {
+pub struct MiddlewareData {
     modified_path: Option<String>,
     room_id: Option<String>,
 }
@@ -406,27 +407,6 @@ async fn authenticate_homeserver(
             "error": "access token invalid"
         }))
     ))
-}
-
-
-async fn request_middleware(
-    req: Request<Body>,
-    next: Next,
-) -> Result<Response<Body>, StatusCode> {
-    info!(
-        "Incoming request: {:#?}",
-        req.uri().path()
-    );
-    Ok(next.run(req).await)
-}
-
-async fn response_middleware(
-    req: Request<Body>,
-    next: Next,
-) -> Result<Response<Body>, StatusCode> {
-    let response = next.run(req).await;
-    info!("Response status: {}", response.status());
-    Ok(response)
 }
 
 async fn index() -> &'static str {

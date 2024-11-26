@@ -25,7 +25,7 @@ pub struct AppService {
 }
 
 
-type RoomState = Vec<ruma::serde::Raw<AnyStateEvent>>;
+pub type RoomState = Vec<ruma::serde::Raw<AnyStateEvent>>;
 
 impl AppService {
     pub async fn new(config: &Config) -> Result<Self, anyhow::Error> {
@@ -103,14 +103,12 @@ impl AppService {
 
 
     pub async fn joined_rooms(&self) -> Option<Vec<ruma::OwnedRoomId>> {
-
         let jr = self.client
             .send_request(joined_rooms::v3::Request::new())
             .await
             .ok()?;
 
         Some(jr.joined_rooms)
-
     }
 
     pub async fn room_id_from_alias(&self, room_alias: ruma::OwnedRoomAliasId) -> Option<ruma::OwnedRoomId> {
@@ -140,6 +138,7 @@ impl AppService {
         let mut rooms_state = Vec::new();
 
         for room_id in jr.joined_rooms {
+
             let st = self.client
                 .send_request(get_state_events::v3::Request::new(
                     room_id,
