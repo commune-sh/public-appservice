@@ -20,7 +20,7 @@ use hyper_util::{client::legacy::connect::HttpConnector, rt::TokioExecutor};
 type Client = hyper_util::client::legacy::Client<HttpConnector, Body>;
 
 use ruma::{
-    RoomId, OwnedRoomId,
+    RoomId, OwnedRoomId, OwnedRoomAliasId, RoomAliasId,
     events::{
         room::member::{RoomMemberEvent, MembershipState},
     },
@@ -315,16 +315,32 @@ async fn validate_room_id(
     next: Next,
 ) -> Result<impl IntoResponse, (StatusCode, Json<Value>)> {
 
-    let room_id = params[0].1.clone();
+    let mut room_id = params[0].1.clone();
 
     let server_name = state.config.matrix.server_name.clone();
 
     if let Ok(id) = is_room_id_ok(&room_id, &server_name) {
-        println!("Validated RoomId: {:#?}", id);
     } else {
-        println!("Failed to validate RoomId: {}", room_id);
-    }
+        println!("Not a valid room id: {}", room_id);
+        println!("Check if valid alias");
 
+        let raw_alias = format!("#{}:{}", room_id, server_name);
+
+        if let Ok(alias) = RoomAliasId::parse(&raw_alias) {
+            println!("Alias: {:#?}", alias);
+            let id = state.appservice.room_id_from_alias(alias).await;
+            match id {
+                Some(id) => {
+                    println!("Fetched Room ID: {:#?}", id);
+                    room_id = id.to_string();
+                }
+                None => {
+                    println!("Failed to get room ID from alias: {}", raw_alias);
+                }
+            }
+        }
+
+    }
 
     req.extensions_mut().insert(room_id);
 

@@ -2,6 +2,7 @@ use crate::config::Config;
 
 use ruma::{
     api::client::{
+        alias::get_alias,
         account::whoami, 
         membership::joined_rooms, 
         state::get_state_events,
@@ -81,6 +82,19 @@ impl AppService {
         Some(jr.joined_rooms)
 
     }
+
+    pub async fn room_id_from_alias(&self, room_alias: ruma::OwnedRoomAliasId) -> Option<ruma::OwnedRoomId> {
+
+        let room_id = self.client
+            .send_request(get_alias::v3::Request::new(
+                room_alias,
+            ))
+            .await
+            .ok()?;
+
+        Some(room_id.room_id)
+    }
+
 
     pub async fn joined_rooms_state(&self) -> Option<Vec<RoomState>> {
 
