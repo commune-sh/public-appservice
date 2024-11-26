@@ -213,7 +213,7 @@ async fn proxy_handler(
         path = mod_path;
     }
 
-    println!("final Path is: {}", path);
+    //println!("final Path is: {}", path);
 
     let path_query = req.uri().query().map(|q| format!("?{}", q)).unwrap_or_default();
 
@@ -349,8 +349,24 @@ async fn validate_public_room(
     next: Next,
 ) -> Result<impl IntoResponse, (StatusCode, Json<Value>)> {
 
-    if let Some(_room_id) = data.room_id.as_ref() {
-       //println!("passed down room id is: {:#?}", room_id);
+    if let Some(room_id) = data.room_id.as_ref() {
+       println!("passed down room id is: {:#?}", room_id);
+
+
+        if let Ok(id) = RoomId::parse(room_id) {
+
+            println!("Checking if user is in room: {:#?}", id);
+
+            if !state.appservice.has_joined_room(id).await {
+                return Err((
+                    StatusCode::FORBIDDEN,
+                    Json(json!({
+                        "errcode": "NOT_IN_ROOM",
+                        "error": "User is not in room"
+                    }))
+                ));
+            }
+        }
     }
 
     Ok(next.run(req).await)

@@ -5,10 +5,10 @@ use ruma::{
         alias::get_alias,
         account::whoami, 
         membership::joined_rooms, 
-        state::get_state_events,
+        state::{get_state_events, get_state_events_for_key},
         membership::{join_room_by_id, leave_room}
     },
-    events::AnyStateEvent, 
+    events::{AnyStateEvent, StateEventType}, 
     OwnedRoomId
 };
 
@@ -59,6 +59,36 @@ impl AppService {
             .ok();
         println!("Join room: {:#?}", jr);
     }
+
+    pub async fn has_joined_room(&self, room_id: OwnedRoomId) -> bool {
+
+        let jr = self.client
+            .send_request(get_state_events_for_key::v3::Request::new(
+                room_id,
+                StateEventType::RoomMember,
+                self.user_id.clone(),
+            ))
+            .await 
+            .ok();
+
+        println!("Has joined room: {:#?}", jr);
+
+        jr.is_some()
+    }
+
+    pub async fn get_room_state(&self, room_id: OwnedRoomId) ->
+    Option<RoomState> {
+
+        let state = self.client
+            .send_request(get_state_events::v3::Request::new(
+                room_id,
+            ))
+            .await
+            .ok()?;
+
+        Some(state.room_state)
+    }
+
 
     pub async fn leave_room(&self, room_id: OwnedRoomId) {
 
