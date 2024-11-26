@@ -20,6 +20,7 @@ use hyper_util::{client::legacy::connect::HttpConnector, rt::TokioExecutor};
 type Client = hyper_util::client::legacy::Client<HttpConnector, Body>;
 
 use ruma::{
+    RoomId, OwnedRoomId,
     events::{
         room::member::{RoomMemberEvent, MembershipState},
     },
@@ -35,6 +36,8 @@ use anyhow;
 use crate::config::Config;
 
 use crate::appservice::AppService;
+
+use crate::utils::is_room_id_ok;
 
 #[warn(dead_code)]
 pub struct Server {
@@ -313,7 +316,15 @@ async fn validate_room_id(
 ) -> Result<impl IntoResponse, (StatusCode, Json<Value>)> {
 
     let room_id = params[0].1.clone();
-    println!("Validating room: {:#?}", room_id);
+
+    let server_name = state.config.matrix.server_name.clone();
+
+    if let Ok(id) = is_room_id_ok(&room_id, &server_name) {
+        println!("Validated RoomId: {:#?}", id);
+    } else {
+        println!("Failed to validate RoomId: {}", room_id);
+    }
+
 
     req.extensions_mut().insert(room_id);
 
