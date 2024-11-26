@@ -92,9 +92,18 @@ impl Server {
             .route_layer(middleware::from_fn_with_state(state.clone(), validate_room_id))
             .with_state(state.clone());
 
+        let more_room_routes = Router::new()
+            .route("/hierarchy", get(proxy_handler))
+            .route("/threads", get(proxy_handler))
+            .route("/relations/*path", get(proxy_handler))
+            .route_layer(middleware::from_fn_with_state(state.clone(), validate_public_room))
+            .route_layer(middleware::from_fn_with_state(state.clone(), validate_room_id))
+            .with_state(state.clone());
+
         let app = Router::new()
             .nest("/_matrix/app/v1", service_routes)
             .nest("/_matrix/client/v3/rooms", room_routes)
+            .nest("/_matrix/client/v1/rooms/:rood_id", more_room_routes)
             .fallback(any(proxy_handler))
             .route("/", get(index))
             .layer(middleware::from_fn(request_middleware))
