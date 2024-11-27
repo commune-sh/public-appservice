@@ -5,20 +5,18 @@ use axum::{
     Json,
 };
 
-use serde::Serialize;
+use ruma::events::room::create::RoomCreateEvent;
 
-use serde_json::{json, Value};
+use serde::Serialize;
+use serde_json::{
+    json, 
+    Value
+};
 
 use std::sync::Arc;
 
 use crate::server::AppState;
-
-
-use ruma::events::room::create::RoomCreateEvent;
-
-
 use crate::appservice::JoinedRoomState;
-
 
 pub async fn public_rooms (
     State(state): State<Arc<AppState>>,

@@ -1,7 +1,17 @@
 use axum::{
     body::Body,
-    extract::{Path, State, OriginalUri, MatchedPath},
-    http::{Request, StatusCode, Uri, header::AUTHORIZATION},
+    extract::{
+        Path, 
+        State, 
+        OriginalUri, 
+        MatchedPath
+    },
+    http::{
+        Request, 
+        StatusCode, 
+        Uri, 
+        header::AUTHORIZATION
+    },
     response::IntoResponse,
     middleware::Next,
     Json,
@@ -9,14 +19,18 @@ use axum::{
 };
 
 use ruma::{
-    RoomId, RoomAliasId,
+    RoomId, 
+    RoomAliasId,
 };
 
-use serde_json::{json, Value};
+use serde_json::{
+    json, 
+    Value
+};
+
 use std::sync::Arc;
 
 use crate::server::AppState;
-
 use crate::utils::is_room_id_ok;
 
 pub async fn authenticate_homeserver(

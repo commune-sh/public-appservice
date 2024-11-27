@@ -1,18 +1,25 @@
 use crate::config::Config;
 
 use ruma::{
+    OwnedRoomId,
     api::client::{
         alias::get_alias,
         account::whoami, 
         membership::joined_rooms, 
-        state::{get_state_events, get_state_events_for_key},
-        membership::{join_room_by_id, leave_room}
+        state::{
+            get_state_events, 
+            get_state_events_for_key
+        },
+        membership::{
+            join_room_by_id, 
+            leave_room
+        }
     },
-    events::{AnyStateEvent, StateEventType}, 
-    OwnedRoomId
+    events::{
+        AnyStateEvent, 
+        StateEventType
+    }
 };
-
-
 
 use anyhow;
 
@@ -23,7 +30,6 @@ pub struct AppService {
     client: ruma::Client<HttpClient>,
     pub user_id: String,
 }
-
 
 pub type RoomState = Vec<ruma::serde::Raw<AnyStateEvent>>;
 

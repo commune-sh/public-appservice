@@ -1,4 +1,7 @@
-use ruma::{RoomId, OwnedRoomId};
+use ruma::{
+    RoomId, 
+    OwnedRoomId
+};
 
 pub fn is_room_id_ok(room_id: &str, server_name: &str) -> Result<OwnedRoomId, String> {
 
