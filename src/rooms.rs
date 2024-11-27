@@ -5,7 +5,17 @@ use axum::{
     Json,
 };
 
-use ruma::events::room::create::RoomCreateEvent;
+use ruma::{
+    MilliSecondsSinceUnixEpoch,
+    events::room::{
+        create::{RoomCreateEvent, RoomCreateEventContent},
+        name::RoomNameEventContent,
+        canonical_alias::RoomCanonicalAliasEventContent,
+        avatar::RoomAvatarEventContent,
+        topic::RoomTopicEventContent,
+        history_visibility::RoomHistoryVisibilityEventContent,
+    }
+};
 
 use serde::Serialize;
 use serde_json::{
@@ -48,8 +58,9 @@ pub async fn public_rooms (
 struct PublicRoom {
     room_id: String,
     #[serde(rename = "type")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     room_type: Option<String>,
-    origin_server_ts: Option<u64>,
+    origin_server_ts: Option<MilliSecondsSinceUnixEpoch>,
     #[serde(rename = "room_type")]
     #[serde(skip_serializing_if = "Option::is_none")]
     commune_room_type: Option<String>,
@@ -106,18 +117,59 @@ fn process_rooms(rooms: Vec<JoinedRoomState>) -> Option<Vec<PublicRoom>> {
                 }
             };
 
-            println!("Event type: {}", event_type);
-
-
             if event_type == "m.room.create" {
-                // Method 1a: Using match
                 match state_event.deserialize_as::<RoomCreateEvent>() {
                     Ok(event) => {
+                        pub_room.origin_server_ts = Some(event.origin_server_ts());
+                        pub_room.sender = Some(event.sender().to_string());
+
                     }
-                    Err(_) => () // Silently ignore deserialization errors
+                    Err(_) => () 
                 }
 
+                if let Ok(Some(content)) = state_event.get_field::<RoomCreateEventContent>("content") {
+                    if let Some(room_type) = content.room_type {
+                        pub_room.room_type = Some(room_type.to_string());
+                    }
+                };
             }
+
+            if event_type == "m.room.name" {
+                if let Ok(Some(content)) = state_event.get_field::<RoomNameEventContent>("content") {
+                    pub_room.name = Some(content.name.to_string());
+                };
+            }
+
+            if event_type == "commune.room.name" {
+                if let Ok(Some(content)) = state_event.get_field::<RoomNameEventContent>("content") {
+                    pub_room.commune_alias = Some(content.name.to_string());
+                };
+            }
+
+            if event_type == "m.room.canonical_alias" {
+                if let Ok(Some(content)) = state_event.get_field::<RoomCanonicalAliasEventContent>("content") {
+                    pub_room.canonical_alias = content.alias.map(|a| a.to_string());
+                };
+            }
+
+            if event_type == "m.room.avatar" {
+                if let Ok(Some(content)) = state_event.get_field::<RoomAvatarEventContent>("content") {
+                    pub_room.avatar_url = content.url.map(|u| u.to_string());
+                };
+            }
+
+            if event_type == "m.room.topic" {
+                if let Ok(Some(content)) = state_event.get_field::<RoomTopicEventContent>("content") {
+                    pub_room.topic = Some(content.topic.to_string());
+                };
+            }
+
+            if event_type == "m.room.history_visibility" {
+                if let Ok(Some(content)) = state_event.get_field::<RoomHistoryVisibilityEventContent>("content") {
+                    pub_room.history_visibility = content.history_visibility.to_string();
+                };
+            }
+
 
         }
 
