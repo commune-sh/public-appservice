@@ -14,10 +14,11 @@ use ruma::{
         avatar::RoomAvatarEventContent,
         topic::RoomTopicEventContent,
         history_visibility::RoomHistoryVisibilityEventContent,
+        join_rules::{JoinRule, RoomJoinRulesEventContent},
     }
 };
 
-use serde::Serialize;
+use serde::{Serialize, Deserialize};
 use serde_json::{
     json, 
     Value
@@ -170,6 +171,23 @@ fn process_rooms(rooms: Vec<JoinedRoomState>) -> Option<Vec<PublicRoom>> {
                 };
             }
 
+            if event_type == "commune.room.banner" {
+                if let Ok(Some(content)) = state_event.get_field::<RoomAvatarEventContent>("content") {
+                    pub_room.avatar_url = content.url.map(|u| u.to_string());
+                };
+            }
+
+            if event_type == "commune.room.type" {
+                if let Ok(Some(content)) = state_event.get_field::<CommuneRoomType>("content") {
+                    pub_room.room_type = content.room_type.map(|t| t.to_string());
+                };
+            }
+
+            if event_type == "m.room.join_rules" {
+                if let Ok(Some(content)) = state_event.get_field::<RoomJoinRulesEventContent>("content") {
+                    pub_room.join_rule = Some(content.join_rule.as_str().to_string());
+                };
+            }
 
         }
 
@@ -178,3 +196,10 @@ fn process_rooms(rooms: Vec<JoinedRoomState>) -> Option<Vec<PublicRoom>> {
 
     Some(public_rooms)
 }
+
+#[derive(Debug, Deserialize, Serialize)]
+struct CommuneRoomType {
+    #[serde(rename = "type")]
+    room_type: Option<String>,
+}
+
