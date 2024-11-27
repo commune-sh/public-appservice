@@ -83,8 +83,6 @@ impl AppService {
             .await 
             .ok();
 
-        println!("Has joined room: {:#?}", jr);
-
         jr.is_some()
     }
 

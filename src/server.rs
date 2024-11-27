@@ -76,6 +76,7 @@ impl Server {
             .with_state(state.clone());
 
         let room_routes_inner = Router::new()
+            .route("/state", get(proxy_handler))
             .route("/joined_members", get(proxy_handler))
             .route("/aliases", get(proxy_handler))
             .route("/event/*path", get(proxy_handler))
