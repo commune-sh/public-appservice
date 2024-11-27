@@ -5,6 +5,8 @@ use axum::{
     Json,
 };
 
+use serde::Serialize;
+
 use serde_json::{json, Value};
 
 use std::sync::Arc;
@@ -46,13 +48,52 @@ pub async fn public_rooms (
     ))
 }
 
-fn process_rooms(rooms: Vec<RoomState>) -> Option<Vec<RoomState>> {
+#[derive(Default, Serialize)]
+struct PublicRoom {
+    room_id: Option<String>,
+    #[serde(rename = "type")]
+    room_type: Option<String>,
+    origin_server_ts: Option<u64>,
+    #[serde(rename = "room_type")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    commune_room_type: Option<String>,
+    name: Option<String>,
+    canonical_alias: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    commune_alias: Option<String>,
+    sender: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    avatar_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    banner_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    topic: Option<String>,
+    join_rule: Option<String>,
+    history_visibility: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    children: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    parents: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    settings: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    room_categories: Option<Vec<Value>>,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "is_false")]
+    is_bridge: bool,
+}
 
-    let mut items = Vec::new();
+fn is_false(b: &bool) -> bool {
+    !*b
+}
 
+fn process_rooms(rooms: Vec<RoomState>) -> Option<Vec<PublicRoom>> {
+
+    let mut public_rooms: Vec<PublicRoom> = Vec::new();
 
     for room in rooms {
-        let mut room_state = Vec::new();
+
+        let mut pub_room = PublicRoom::default();
 
         for state_event in room {
 
@@ -72,18 +113,18 @@ fn process_rooms(rooms: Vec<RoomState>) -> Option<Vec<RoomState>> {
             if event_type == "m.room.create" {
                 // Method 1a: Using match
                 match state_event.deserialize_as::<RoomCreateEvent>() {
-                    Ok(event) => println!("Event: {:#?}", event),
+                    Ok(event) => {
+                        pub_room.room_id = Some(event.room_id().to_string())
+                    }
                     Err(_) => () // Silently ignore deserialization errors
                 }
 
-                room_state.push(state_event);
             }
-
 
         }
 
-        items.push(room_state);
+        public_rooms.push(pub_room);
     }
 
-    Some(items)
+    Some(public_rooms)
 }
