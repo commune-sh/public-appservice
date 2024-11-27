@@ -1,6 +1,6 @@
 use axum::{
-    extract::{State },
-    http::{StatusCode },
+    extract::State,
+    http::StatusCode,
     response::IntoResponse,
     Json,
 };
@@ -14,13 +14,11 @@ use std::sync::Arc;
 use crate::server::AppState;
 
 
-use ruma::{
-    events::room::create::RoomCreateEvent,
-};
+use ruma::events::room::create::RoomCreateEvent;
 
 
+use crate::appservice::JoinedRoomState;
 
-type RoomState = crate::appservice::RoomState;
 
 pub async fn public_rooms (
     State(state): State<Arc<AppState>>,
@@ -50,7 +48,7 @@ pub async fn public_rooms (
 
 #[derive(Default, Serialize)]
 struct PublicRoom {
-    room_id: Option<String>,
+    room_id: String,
     #[serde(rename = "type")]
     room_type: Option<String>,
     origin_server_ts: Option<u64>,
@@ -87,15 +85,18 @@ fn is_false(b: &bool) -> bool {
     !*b
 }
 
-fn process_rooms(rooms: Vec<RoomState>) -> Option<Vec<PublicRoom>> {
+fn process_rooms(rooms: Vec<JoinedRoomState>) -> Option<Vec<PublicRoom>> {
 
     let mut public_rooms: Vec<PublicRoom> = Vec::new();
 
     for room in rooms {
 
-        let mut pub_room = PublicRoom::default();
+        let mut pub_room = PublicRoom {
+            room_id: room.room_id.to_string(),
+            ..Default::default()
+        };
 
-        for state_event in room {
+        for state_event in room.state.unwrap_or_else(|| Vec::new()) {
 
             let event_type = match state_event.get_field::<String>("type") {
                 Ok(Some(t)) => t,
@@ -114,7 +115,6 @@ fn process_rooms(rooms: Vec<RoomState>) -> Option<Vec<PublicRoom>> {
                 // Method 1a: Using match
                 match state_event.deserialize_as::<RoomCreateEvent>() {
                     Ok(event) => {
-                        pub_room.room_id = Some(event.room_id().to_string())
                     }
                     Err(_) => () // Silently ignore deserialization errors
                 }

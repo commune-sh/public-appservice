@@ -27,6 +27,12 @@ pub struct AppService {
 
 pub type RoomState = Vec<ruma::serde::Raw<AnyStateEvent>>;
 
+#[derive(Clone)]
+pub struct JoinedRoomState {
+    pub room_id: OwnedRoomId,
+    pub state: Option<RoomState>,
+}
+
 impl AppService {
     pub async fn new(config: &Config) -> Result<Self, anyhow::Error> {
 
@@ -124,7 +130,9 @@ impl AppService {
     }
 
 
-    pub async fn joined_rooms_state(&self) -> Option<Vec<RoomState>> {
+    pub async fn joined_rooms_state(&self) -> Option<Vec<JoinedRoomState>> {
+
+        let mut joined_rooms: Vec<JoinedRoomState> = Vec::new();
 
         let jr = self.client
             .send_request(joined_rooms::v3::Request::new())
@@ -135,9 +143,13 @@ impl AppService {
             return None;
         }
 
-        let mut rooms_state = Vec::new();
-
         for room_id in jr.joined_rooms {
+
+            let mut jrs = JoinedRoomState {
+                room_id: room_id.clone(),
+                state: None,
+            };
+
 
             let st = self.client
                 .send_request(get_state_events::v3::Request::new(
@@ -145,6 +157,10 @@ impl AppService {
                 ))
                 .await
                 .ok()?;
+
+            jrs.state = Some(st.room_state);
+
+            joined_rooms.push(jrs);
 
 
             /*
@@ -175,9 +191,9 @@ impl AppService {
 */
 
 
-            rooms_state.push(st.room_state);
+            //rooms_state.push(st.room_state);
         }
 
-        Some(rooms_state)
+        Some(joined_rooms)
     }
 }

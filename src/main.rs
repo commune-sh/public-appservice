@@ -1,21 +1,15 @@
 use public_appservice::*; 
-
 use config::Config;
-
 use appservice::AppService;
-
 use server::Server;
 
-use ruma::{
-    api::client::{account::whoami, membership::joined_rooms, message::send_message_event},
-    events::room::message::RoomMessageEventContent,
-    OwnedRoomAliasId, TransactionId,
-};
-
-type HttpClient = ruma::client::http_client::HyperNativeTls;
+use tracing::info;
+use tracing_subscriber;
 
 #[tokio::main]
 async fn main() {
+
+    tracing_subscriber::fmt::init();
 
     // Read config
     let config = Config::new();
@@ -25,25 +19,14 @@ async fn main() {
 
     let whoami = appservice.whoami().await;
 
-    match whoami {
-        Some(whoami) => {
-            println!("Logged in as: {:#?}", whoami);
-        }
-        None => {
-            println!("Failed to get whoami");
-        }
-    }
-
-    if let Some(rooms) = appservice.joined_rooms().await {
-        println!("Joined rooms: {:#?}", rooms.len());
-    }
-
-
-    if let Some(room_states) = appservice.joined_rooms_state().await {
-        println!("States: {:#?}", room_states.len());
+    if let None = whoami {
+        eprintln!("Failed to authenticate with homeserver. Check your access token.");
+        std::process::exit(1);
     }
 
     let server = Server::new(config.clone(), appservice.clone());
+
+    info!("Starting Commune public appservice...");
 
     if let Err(e) = server.run(config.appservice.port.clone()).await {
         eprintln!("Server error: {}", e);

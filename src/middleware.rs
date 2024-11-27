@@ -1,19 +1,15 @@
 use axum::{
     body::Body,
     extract::{Path, State, OriginalUri, MatchedPath},
-    http::{Request, Response, StatusCode, Uri, HeaderValue, header::AUTHORIZATION},
+    http::{Request, StatusCode, Uri, header::AUTHORIZATION},
     response::IntoResponse,
-    middleware::{self, Next},
+    middleware::Next,
     Json,
     Extension
 };
 
 use ruma::{
-    RoomId, OwnedRoomId, OwnedRoomAliasId, RoomAliasId,
-    events::{
-        room::member::{RoomMemberEvent, MembershipState},
-    },
-    serde::Raw,
+    RoomId, RoomAliasId,
 };
 
 use serde_json::{json, Value};
@@ -64,7 +60,6 @@ pub struct Data {
 }
 
 pub async fn validate_room_id(
-    //Path(room_id): Path<String>,
     Path(params): Path<Vec<(String, String)>>,
     State(state): State<Arc<AppState>>,
     mut req: Request<Body>,
@@ -146,9 +141,8 @@ pub async fn validate_room_id(
 
 
 pub async fn validate_public_room(
-    //Path(room_id): Path<String>,
     Extension(data): Extension<Data>,
-    Path(params): Path<Vec<(String, String)>>,
+    //Path(params): Path<Vec<(String, String)>>,
     State(state): State<Arc<AppState>>,
     req: Request<Body>,
     next: Next,
