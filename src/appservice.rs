@@ -17,11 +17,19 @@ use ruma::{
     },
     events::{
         AnyStateEvent, 
-        StateEventType
+        StateEventType,
+        room::{
+            name::RoomNameEventContent,
+            canonical_alias::RoomCanonicalAliasEventContent,
+            avatar::RoomAvatarEventContent,
+            topic::RoomTopicEventContent,
+        }
     }
 };
 
 use anyhow;
+
+use serde::{Serialize, Deserialize};
 
 pub type HttpClient = ruma::client::http_client::HyperNativeTls;
 
@@ -200,4 +208,76 @@ impl AppService {
 
         Some(joined_rooms)
     }
+
+    pub async fn get_room_info(&self, room_id: OwnedRoomId) ->
+    Option<RoomInfo> {
+
+        let mut room_info = RoomInfo {
+            room_id: room_id.to_string(),
+            ..Default::default()
+        };
+
+        let state = self.client
+            .send_request(get_state_events::v3::Request::new(
+                room_id,
+            ))
+            .await
+            .ok()?;
+
+        for state_event in state.room_state {
+
+            let event_type = match state_event.get_field::<String>("type") {
+                Ok(Some(t)) => t,
+                Ok(None) => {
+                    continue;
+                }
+                Err(_) => {
+                    continue;
+                }
+            };
+
+            if event_type == "m.room.name" {
+                if let Ok(Some(content)) = state_event.get_field::<RoomNameEventContent>("content") {
+                    room_info.name = Some(content.name.to_string());
+                };
+            }
+
+            if event_type == "m.room.canonical_alias" {
+                if let Ok(Some(content)) = state_event.get_field::<RoomCanonicalAliasEventContent>("content") {
+                    room_info.canonical_alias = content.alias.map(|a| a.to_string());
+                };
+            }
+
+            if event_type == "m.room.avatar" {
+                if let Ok(Some(content)) = state_event.get_field::<RoomAvatarEventContent>("content") {
+                    room_info.avatar_url = content.url.map(|u| u.to_string());
+                };
+            }
+
+            if event_type == "commune.room.banner" {
+                if let Ok(Some(content)) = state_event.get_field::<RoomAvatarEventContent>("content") {
+                    room_info.avatar_url = content.url.map(|u| u.to_string());
+                };
+            }
+
+            if event_type == "m.room.topic" {
+                if let Ok(Some(content)) = state_event.get_field::<RoomTopicEventContent>("content") {
+                    room_info.topic = Some(content.topic.to_string());
+                };
+            }
+        }
+
+        Some(room_info)
+    }
+
+}
+
+#[derive(Default, Debug, Deserialize, Serialize)]
+pub struct RoomInfo {
+    pub room_id: String,
+    pub name: Option<String>,
+    pub canonical_alias: Option<String>,
+    pub avatar_url: Option<String>,
+    pub banner_url: Option<String>,
+    pub topic: Option<String>,
 }

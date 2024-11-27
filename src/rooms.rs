@@ -1,11 +1,12 @@
 use axum::{
-    extract::State,
+    extract::{Path, State, Query},
     http::StatusCode,
     response::IntoResponse,
     Json,
 };
 
 use ruma::{
+    RoomId,
     MilliSecondsSinceUnixEpoch,
     events::{
         room::{
@@ -30,7 +31,10 @@ use serde_json::{
 use std::sync::Arc;
 
 use crate::server::AppState;
-use crate::appservice::JoinedRoomState;
+use crate::appservice::{
+    JoinedRoomState,
+    RoomInfo,
+};
 
 pub async fn public_rooms (
     State(state): State<Arc<AppState>>,
@@ -231,3 +235,46 @@ struct CommuneRoomType {
     room_type: Option<String>,
 }
 
+#[derive(Debug, Deserialize, Serialize)]
+pub struct RoomInfoOptions {
+    #[serde(skip_deserializing)]
+    room_id: String,
+    pub child_room: Option<String>,
+    pub event_id: Option<String>,
+}
+
+pub async fn room_info (
+    Path(params): Path<Vec<(String, String)>>,
+    Query(info): Query<RoomInfoOptions>,
+    State(state): State<Arc<AppState>>,
+) -> Result<impl IntoResponse, (StatusCode, Json<Value>)> {
+
+    let room_id = params[0].1.clone();
+    println!("Room ID: {:#?}", room_id);
+
+    println!("Info: {:#?}", info);
+
+    if let Ok(id) = RoomId::parse(room_id) {
+        let room_state =  state.appservice.get_room_state(id).await;
+        println!("Room State: {:#?}", room_state);
+    }
+
+
+    Ok((
+        StatusCode::OK,
+        Json(json!({
+            "rooms": json!([]),
+        }))
+    ))
+}
+
+fn get_room_info(room: &RoomInfo) -> RoomInfo {
+    RoomInfo {
+        room_id: room.room_id.to_string(),
+        name: room.name.clone(),
+        canonical_alias: room.canonical_alias.clone(),
+        avatar_url: room.avatar_url.clone(),
+        banner_url: room.banner_url.clone(),
+        topic: room.topic.clone(),
+    }
+}

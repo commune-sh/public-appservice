@@ -28,7 +28,7 @@ use anyhow;
 
 use crate::config::Config;
 use crate::appservice::AppService;
-use crate::rooms::public_rooms;
+use crate::rooms::{public_rooms, room_info};
 use crate::middleware::{
     Data,
     authenticate_homeserver,
@@ -77,6 +77,7 @@ impl Server {
 
         let room_routes_inner = Router::new()
             .route("/state", get(proxy_handler))
+            .route("/info", get(room_info))
             .route("/joined_members", get(proxy_handler))
             .route("/aliases", get(proxy_handler))
             .route("/event/*path", get(proxy_handler))
@@ -192,7 +193,6 @@ async fn transactions(
 
 async fn proxy_handler(
     Extension(data): Extension<Data>,
-    //Path(params): Path<Vec<(String, String)>>,
     State(state): State<Arc<AppState>>,
     mut req: Request<Body>,
 ) -> Result<Response<Body>, StatusCode> {
