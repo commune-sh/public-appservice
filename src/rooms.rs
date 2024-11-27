@@ -7,14 +7,17 @@ use axum::{
 
 use ruma::{
     MilliSecondsSinceUnixEpoch,
-    events::room::{
-        create::{RoomCreateEvent, RoomCreateEventContent},
-        name::RoomNameEventContent,
-        canonical_alias::RoomCanonicalAliasEventContent,
-        avatar::RoomAvatarEventContent,
-        topic::RoomTopicEventContent,
-        history_visibility::RoomHistoryVisibilityEventContent,
-        join_rules::{JoinRule, RoomJoinRulesEventContent},
+    events::{
+        room::{
+            create::{RoomCreateEvent, RoomCreateEventContent},
+            name::RoomNameEventContent,
+            canonical_alias::RoomCanonicalAliasEventContent,
+            avatar::RoomAvatarEventContent,
+            topic::RoomTopicEventContent,
+            history_visibility::RoomHistoryVisibilityEventContent,
+            join_rules::RoomJoinRulesEventContent,
+        },
+        space::child::SpaceChildEventContent, 
     }
 };
 
@@ -80,8 +83,6 @@ struct PublicRoom {
     history_visibility: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     children: Option<Vec<String>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    parents: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     settings: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -187,6 +188,33 @@ fn process_rooms(rooms: Vec<JoinedRoomState>) -> Option<Vec<PublicRoom>> {
                 if let Ok(Some(content)) = state_event.get_field::<RoomJoinRulesEventContent>("content") {
                     pub_room.join_rule = Some(content.join_rule.as_str().to_string());
                 };
+            }
+
+            let bridge_types = vec!["m.bridge", "m.room.bridged", "m.room.discord", "m.room.irc", "uk.half-shot.bridge"];
+
+            if bridge_types.contains(&event_type.as_str()) {
+                pub_room.is_bridge = true;
+            }
+
+            if event_type == "m.space.child" {
+                if let Ok(Some(content)) = state_event.get_field::<SpaceChildEventContent>("content") {
+                    if content.via.len() == 0 {
+                        continue;
+                    }
+                };
+
+                if let Ok(Some(state_key)) = state_event.get_field::<String>("state_key") {
+                    match pub_room.children {
+                        Some(ref mut children) => {
+                            children.push(state_key);
+                        }
+                        None => {
+                            pub_room.children = Some(vec![state_key]);
+                        }
+                    }
+
+                };
+
             }
 
         }
