@@ -17,12 +17,14 @@ async fn main() {
 
     let appservice = AppService::new(&config).await.unwrap();
 
+    /*
     let whoami = appservice.whoami().await;
 
     if let None = whoami {
         eprintln!("Failed to authenticate with homeserver. Check your access token.");
         std::process::exit(1);
     }
+*/
 
     let server = Server::new(config.clone(), appservice.clone());
 

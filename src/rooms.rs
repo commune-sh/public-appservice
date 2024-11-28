@@ -9,6 +9,7 @@ use ruma::{
     RoomId,
     EventId,
     MilliSecondsSinceUnixEpoch,
+    OwnedMxcUri,
     events::{
         AnyTimelineEvent,
         room::{
@@ -32,13 +33,13 @@ use serde_json::{
 
 use std::sync::Arc;
 
-use thiserror::Error;
-
 use crate::server::AppState;
 use crate::appservice::{
     JoinedRoomState,
     RoomSummary
 };
+
+use crate::error::AppserviceError;
 
 pub async fn public_rooms (
     State(state): State<Arc<AppState>>,
@@ -253,28 +254,19 @@ pub struct RoomInfo {
     info: RoomSummary,
     #[serde(skip_serializing_if = "Option::is_none")]
     room: Option<RoomSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     event: Option<ruma::serde::Raw<AnyTimelineEvent>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    sender: Option<Sender>,
 }
 
-#[derive(Error, Debug)]
-pub enum AppserviceError {
-    #[error("Matrix API error: {0}")]
-    MatrixError(String),
-    #[error("Event not found: {0}")]
-    EventNotFound(String),
+#[derive(Debug, Deserialize, Serialize)]
+pub struct Sender {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub avatar_url: Option<OwnedMxcUri>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub displayname: Option<String>,
 }
-
-impl axum::response::IntoResponse for AppserviceError {
-    fn into_response(self) -> axum::response::Response {
-        let (status, message) = match self {
-            AppserviceError::MatrixError(_) => (StatusCode::BAD_GATEWAY, self.to_string()),
-            AppserviceError::EventNotFound(_) => (StatusCode::NOT_FOUND, self.to_string()),
-        };
-
-        (status, Json(json!({ "error": message }))).into_response()
-    }
-}
-
 
 pub async fn room_info (
     Path(params): Path<Vec<(String, String)>>,
@@ -296,6 +288,7 @@ pub async fn room_info (
         info: summary,
         room: None,
         event: None,
+        sender: None,
     };
 
 
@@ -303,10 +296,26 @@ pub async fn room_info (
         let parsed_event_id = EventId::parse(&event_id)
             .map_err(|_| AppserviceError::MatrixError("Invalid event ID".to_string()))?;
 
-        let event = state.appservice.get_room_event(parsed_id, parsed_event_id)
-            .await.ok_or(AppserviceError::EventNotFound("Event not found".to_string()))?;
+        if let Some(event) = state.appservice.get_room_event(parsed_id, parsed_event_id).await {
 
-        info.event = Some(event);
+            info.event = Some(event.clone());
+
+            if let Ok(Some(sender)) = event.get_field::<String>("sender") {
+                println!("sender: {:#?}", sender);
+
+                let profile = state.appservice.get_profile(sender).await;
+
+                if let Some(profile) = profile {
+                    info.sender = Some(Sender {
+                        avatar_url: profile.avatar_url,
+                        displayname: profile.displayname,
+                    });
+                }
+
+            }
+
+        }
+
     }
 
 

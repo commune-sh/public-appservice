@@ -11,7 +11,7 @@ use axum::{
     },
     middleware::{self},
     response::IntoResponse,
-    routing::{get, put, any},
+    routing::{get, put},
     Json,
     Router,
     Extension
@@ -77,6 +77,7 @@ impl Server {
 
         let room_routes_inner = Router::new()
             .route("/state", get(proxy_handler))
+            .route("/messages", get(proxy_handler))
             .route("/info", get(room_info))
             .route("/joined_members", get(proxy_handler))
             .route("/aliases", get(proxy_handler))
@@ -103,9 +104,8 @@ impl Server {
             .nest("/_matrix/app/v1", service_routes)
             .nest("/_matrix/client/v3/rooms", room_routes)
             .nest("/_matrix/client/v1/rooms/:rood_id", more_room_routes)
-            .fallback(any(proxy_handler))
-            .route("/", get(index))
             .route("/publicRooms", get(public_rooms))
+            .route("/", get(index))
             .with_state(state);
 
 
@@ -163,7 +163,7 @@ async fn transactions(
 
             // Ignore membership events for other users
             let invited_user = event.state_key().to_owned();
-            if invited_user != state.appservice.user_id {
+            if invited_user != state.appservice.user_id() {
                 info!("Ignoring event for user: {}", invited_user);
                 continue;
             }

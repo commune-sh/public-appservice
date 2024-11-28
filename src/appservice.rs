@@ -3,6 +3,8 @@ use crate::config::Config;
 use ruma::{
     OwnedRoomId,
     OwnedEventId,
+    UserId,
+    OwnedUserId,
     api::client::{
         alias::get_alias,
         account::whoami, 
@@ -15,7 +17,8 @@ use ruma::{
         membership::{
             join_room_by_id, 
             leave_room
-        }
+        },
+        profile::get_profile
     },
     events::{
         AnyTimelineEvent,
@@ -39,7 +42,7 @@ pub type HttpClient = ruma::client::http_client::HyperNativeTls;
 #[derive(Clone)]
 pub struct AppService {
     client: ruma::Client<HttpClient>,
-    pub user_id: String,
+    pub user_id: Box<OwnedUserId>,
 }
 
 pub type RoomState = Vec<ruma::serde::Raw<AnyStateEvent>>;
@@ -60,16 +63,29 @@ impl AppService {
             .await
             .unwrap();
 
-        let user_id = format!("@{}:{}", config.appservice.sender_localpart, config.matrix.server_name);
+        let user_id = UserId::parse(&format!("@{}:{}", config.appservice.sender_localpart, config.matrix.server_name))?;
 
-        Ok(Self { client, user_id })
+        let whoami = client
+            .send_request(whoami::v3::Request::new())
+            .await;
+
+        if let Err(_) = whoami {
+            eprintln!("Failed to authenticate with homeserver. Check your access token.");
+            std::process::exit(1);
+        }
+
+        Ok(Self { client, user_id: Box::new(user_id)})
     }
 
-    pub async fn whoami(&self) -> Option<whoami::v3::Response> {
-        self.client
+    pub fn user_id(&self) -> String {
+        self.user_id.to_string()
+    }
+
+    pub async fn whoami(&self) -> Result<whoami::v3::Response, anyhow::Error> {
+        let r = self.client
             .send_request(whoami::v3::Request::new())
-            .await
-            .ok()
+            .await?;
+        Ok(r)
     }
 
     pub async fn join_room(&self, room_id: OwnedRoomId) {
@@ -89,7 +105,7 @@ impl AppService {
             .send_request(get_state_events_for_key::v3::Request::new(
                 room_id,
                 StateEventType::RoomMember,
-                self.user_id.clone(),
+                self.user_id()
             ))
             .await 
             .ok();
@@ -110,7 +126,6 @@ impl AppService {
         Some(state.room_state)
     }
 
-
     pub async fn leave_room(&self, room_id: OwnedRoomId) {
 
         let jr = self.client
@@ -121,7 +136,6 @@ impl AppService {
             .ok();
         println!("Left room: {:#?}", jr);
     }
-
 
     pub async fn joined_rooms(&self) -> Option<Vec<ruma::OwnedRoomId>> {
         let jr = self.client
@@ -143,7 +157,6 @@ impl AppService {
 
         Some(room_id.room_id)
     }
-
 
     pub async fn joined_rooms_state(&self) -> Option<Vec<JoinedRoomState>> {
 
@@ -193,6 +206,20 @@ impl AppService {
             .ok()?;
 
         Some(event.event)
+    }
+
+    pub async fn get_profile(&self, user_id: String) -> Option<ruma::api::client::profile::get_profile::v3::Response> {
+
+        let parsed_id = ruma::OwnedUserId::try_from(user_id.clone()).ok()?;
+
+        let profile = self.client
+            .send_request(get_profile::v3::Request::new(
+                parsed_id,
+            ))
+            .await
+            .ok()?;
+
+        Some(profile)
     }
 
     pub async fn get_room_summary(&self, room_id: OwnedRoomId) ->
