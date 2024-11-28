@@ -16,6 +16,8 @@ pub enum AppserviceError {
     MatrixError(String),
     #[error("Event not found: {0}")]
     EventNotFound(String),
+    #[error("M_FORBIDDEN")]
+    IncorrectHSToken,
 }
 
 impl IntoResponse for AppserviceError {
@@ -24,6 +26,8 @@ impl IntoResponse for AppserviceError {
             AppserviceError::HomeserverError(_) => (StatusCode::BAD_GATEWAY, self.to_string()),
             AppserviceError::MatrixError(_) => (StatusCode::BAD_GATEWAY, self.to_string()),
             AppserviceError::EventNotFound(_) => (StatusCode::NOT_FOUND, self.to_string()),
+            AppserviceError::IncorrectHSToken => (StatusCode::UNAUTHORIZED, self.to_string()),
+
         };
 
         (status, Json(json!({ "error": message }))).into_response()

@@ -53,8 +53,7 @@ pub async fn authenticate_homeserver(
     Err((
         StatusCode::UNAUTHORIZED,
         Json(json!({
-            "errcode": "BAD_ACCESS_TOKEN",
-            "error": "access token invalid"
+            "errcode": "M_FORBIDDEN",
         }))
     ))
 }

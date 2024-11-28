@@ -10,7 +10,7 @@ http = "1.1.0"
 hyper = { version = "1.5.1", features = ["full"] }
 hyper-util = { version = "0.1.10", features = ["client", "client-legacy", "http2"] }
 reqwest = { version = "0.12.9", features = ["json"] }
-ruma = { version = "0.11.1", features = ["appservice-api", "client-hyper-native-tls", "client-api-c", "client-ext-client-api"] }
+ruma = { version = "0.11.1", features = ["appservice-api-c", "client-hyper-native-tls", "client-api-c", "client-ext-client-api"] }
 serde = { version = "1.0.215", features = ["derive"] }
 serde_json = "1.0.133"
 thiserror = "2.0.3"

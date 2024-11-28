@@ -1,13 +1,12 @@
 use crate::config::Config;
-use crate::error::AppserviceError;
 
 use ruma::{
-    client::Error as RumaError,
     OwnedRoomId,
     OwnedEventId,
     UserId,
     OwnedUserId,
     api::client::{
+        appservice::request_ping,
         alias::get_alias,
         account::whoami, 
         membership::joined_rooms, 
@@ -20,7 +19,7 @@ use ruma::{
             join_room_by_id, 
             leave_room
         },
-        profile::get_profile,
+        profile::get_profile
     },
     events::{
         AnyTimelineEvent,
@@ -44,6 +43,7 @@ pub type HttpClient = ruma::client::http_client::HyperNativeTls;
 #[derive(Clone)]
 pub struct AppService {
     client: ruma::Client<HttpClient>,
+    pub appservice_id: String,
     pub user_id: Box<OwnedUserId>,
 }
 
@@ -76,7 +76,21 @@ impl AppService {
             std::process::exit(1);
         }
 
-        Ok(Self { client, user_id: Box::new(user_id)})
+        Ok(Self { 
+            client, 
+            appservice_id: config.appservice.id.clone(),
+            user_id: Box::new(user_id)
+        })
+    }
+
+    pub async fn ping_homeserver(&self) -> Result<(), anyhow::Error> {
+        let r = self.client
+            .send_request(request_ping::v1::Request::new(
+                self.appservice_id.to_string()
+            ))
+            .await?;
+        println!("Ping response: {:#?}", r);
+        Ok(())
     }
 
     pub fn user_id(&self) -> String {
@@ -167,13 +181,7 @@ impl AppService {
         let jr = self.client
             .send_request(joined_rooms::v3::Request::new())
             .await
-            .map_err(|e| match e {
-                RumaError::Response(_) => {
-                    println!("Error: {:#?}", e);
-                    AppserviceError::HomeserverError("Homeserver unreachable".to_string())
-                } 
-                _ => AppserviceError::MatrixError("Matrix API error".to_string()),
-            })?;
+            .map_err(|e| anyhow::anyhow!("Error getting joined rooms: {}", e))?;
 
         if jr.joined_rooms.len() == 0 {
             return Ok(joined_rooms);

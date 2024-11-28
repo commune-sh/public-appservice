@@ -11,7 +11,6 @@ async fn main() {
 
     tracing_subscriber::fmt::init();
 
-    // Read config
     let config = Config::new();
 
     let appservice = AppService::new(&config).await.unwrap();
