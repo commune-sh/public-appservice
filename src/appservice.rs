@@ -1,6 +1,8 @@
 use crate::config::Config;
+use crate::error::AppserviceError;
 
 use ruma::{
+    client::Error as RumaError,
     OwnedRoomId,
     OwnedEventId,
     UserId,
@@ -18,7 +20,7 @@ use ruma::{
             join_room_by_id, 
             leave_room
         },
-        profile::get_profile
+        profile::get_profile,
     },
     events::{
         AnyTimelineEvent,
@@ -158,17 +160,23 @@ impl AppService {
         Some(room_id.room_id)
     }
 
-    pub async fn joined_rooms_state(&self) -> Option<Vec<JoinedRoomState>> {
+    pub async fn joined_rooms_state(&self) -> Result<Vec<JoinedRoomState>, anyhow::Error> {
 
         let mut joined_rooms: Vec<JoinedRoomState> = Vec::new();
 
         let jr = self.client
             .send_request(joined_rooms::v3::Request::new())
             .await
-            .ok()?;
+            .map_err(|e| match e {
+                RumaError::Response(_) => {
+                    println!("Error: {:#?}", e);
+                    AppserviceError::HomeserverError("Homeserver unreachable".to_string())
+                } 
+                _ => AppserviceError::MatrixError("Matrix API error".to_string()),
+            })?;
 
         if jr.joined_rooms.len() == 0 {
-            return None;
+            return Ok(joined_rooms);
         }
 
         for room_id in jr.joined_rooms {
@@ -183,8 +191,7 @@ impl AppService {
                 .send_request(get_state_events::v3::Request::new(
                     room_id,
                 ))
-                .await
-                .ok()?;
+                .await?;
 
             jrs.state = Some(st.room_state);
 
@@ -192,7 +199,7 @@ impl AppService {
 
         }
 
-        Some(joined_rooms)
+        Ok(joined_rooms)
     }
 
     pub async fn get_room_event(&self, room_id: OwnedRoomId, event_id: OwnedEventId) -> Option<ruma::serde::Raw<AnyTimelineEvent>> {

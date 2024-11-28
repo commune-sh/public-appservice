@@ -43,26 +43,19 @@ use crate::error::AppserviceError;
 
 pub async fn public_rooms (
     State(state): State<Arc<AppState>>,
-) -> Result<impl IntoResponse, (StatusCode, Json<Value>)> {
+) -> Result<impl IntoResponse, AppserviceError> {
 
-    let rooms = state.appservice.joined_rooms_state().await;
+    let rooms = state.appservice.joined_rooms_state()
+        .await 
+        .map_err(|_| AppserviceError::MatrixError("Failed to fetch rooms".to_string()))?;
 
-    if let Some(room_states) = rooms {
 
-        let processed = process_rooms(room_states);
-
-        return Ok((
-            StatusCode::OK,
-            Json(json!({
-                "rooms": json!(processed),
-            }))
-        ))
-    }
+    let processed = process_rooms(rooms);
 
     Ok((
         StatusCode::OK,
         Json(json!({
-            "rooms": json!([]),
+            "rooms": json!(processed),
         }))
     ))
 }
