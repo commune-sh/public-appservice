@@ -7,8 +7,10 @@ use axum::{
 
 use ruma::{
     RoomId,
+    EventId,
     MilliSecondsSinceUnixEpoch,
     events::{
+        AnyTimelineEvent,
         room::{
             create::{RoomCreateEvent, RoomCreateEventContent},
             name::RoomNameEventContent,
@@ -30,10 +32,12 @@ use serde_json::{
 
 use std::sync::Arc;
 
+use thiserror::Error;
+
 use crate::server::AppState;
 use crate::appservice::{
     JoinedRoomState,
-    RoomInfo,
+    RoomSummary
 };
 
 pub async fn public_rooms (
@@ -243,38 +247,71 @@ pub struct RoomInfoOptions {
     pub event_id: Option<String>,
 }
 
+#[derive(Debug, Deserialize, Serialize)]
+pub struct RoomInfo {
+    #[serde(skip_deserializing)]
+    info: RoomSummary,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    room: Option<RoomSummary>,
+    event: Option<ruma::serde::Raw<AnyTimelineEvent>>,
+}
+
+#[derive(Error, Debug)]
+pub enum AppserviceError {
+    #[error("Matrix API error: {0}")]
+    MatrixError(String),
+    #[error("Event not found: {0}")]
+    EventNotFound(String),
+}
+
+impl axum::response::IntoResponse for AppserviceError {
+    fn into_response(self) -> axum::response::Response {
+        let (status, message) = match self {
+            AppserviceError::MatrixError(_) => (StatusCode::BAD_GATEWAY, self.to_string()),
+            AppserviceError::EventNotFound(_) => (StatusCode::NOT_FOUND, self.to_string()),
+        };
+
+        (status, Json(json!({ "error": message }))).into_response()
+    }
+}
+
+
 pub async fn room_info (
     Path(params): Path<Vec<(String, String)>>,
-    Query(info): Query<RoomInfoOptions>,
+    Query(query): Query<RoomInfoOptions>,
     State(state): State<Arc<AppState>>,
-) -> Result<impl IntoResponse, (StatusCode, Json<Value>)> {
+) -> Result<impl IntoResponse, AppserviceError> {
 
     let room_id = params[0].1.clone();
-    println!("Room ID: {:#?}", room_id);
 
-    println!("Info: {:#?}", info);
+    println!("query: {:#?}", query);
 
-    if let Ok(id) = RoomId::parse(room_id) {
-        let room_state =  state.appservice.get_room_state(id).await;
-        println!("Room State: {:#?}", room_state);
+    let parsed_id = RoomId::parse(&room_id)
+        .map_err(|_| AppserviceError::MatrixError("Invalid room ID".to_string()))?;
+
+    let summary =  state.appservice.get_room_summary(parsed_id.clone())
+        .await.ok_or(AppserviceError::MatrixError("Room not found".to_string()))?;
+
+    let mut info = RoomInfo {
+        info: summary,
+        room: None,
+        event: None,
+    };
+
+
+    if let Some(event_id) = query.event_id {
+        let parsed_event_id = EventId::parse(&event_id)
+            .map_err(|_| AppserviceError::MatrixError("Invalid event ID".to_string()))?;
+
+        let event = state.appservice.get_room_event(parsed_id, parsed_event_id)
+            .await.ok_or(AppserviceError::EventNotFound("Event not found".to_string()))?;
+
+        info.event = Some(event);
     }
 
 
     Ok((
         StatusCode::OK,
-        Json(json!({
-            "rooms": json!([]),
-        }))
+        Json(json!(info))
     ))
-}
-
-fn get_room_info(room: &RoomInfo) -> RoomInfo {
-    RoomInfo {
-        room_id: room.room_id.to_string(),
-        name: room.name.clone(),
-        canonical_alias: room.canonical_alias.clone(),
-        avatar_url: room.avatar_url.clone(),
-        banner_url: room.banner_url.clone(),
-        topic: room.topic.clone(),
-    }
 }

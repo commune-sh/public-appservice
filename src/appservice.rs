@@ -2,6 +2,7 @@ use crate::config::Config;
 
 use ruma::{
     OwnedRoomId,
+    OwnedEventId,
     api::client::{
         alias::get_alias,
         account::whoami, 
@@ -10,12 +11,14 @@ use ruma::{
             get_state_events, 
             get_state_events_for_key
         },
+        room::get_room_event,
         membership::{
             join_room_by_id, 
             leave_room
         }
     },
     events::{
+        AnyTimelineEvent,
         AnyStateEvent, 
         StateEventType,
         room::{
@@ -174,45 +177,28 @@ impl AppService {
 
             joined_rooms.push(jrs);
 
-
-            /*
-            for state_event in &st.room_state {
-
-                if state_event.get_field::<String>("type").ok()?.as_deref() == Some("m.room.create") {
-                    let event = state_event.deserialize_as::<AnyStateEvent>().ok()?;
-
-                    match event {
-                        AnyStateEvent::RoomCreate(event) => {
-                            println!("Event: {:#?}", event);
-                        }
-                        _ => {
-                            println!("Unknown event: {:#?}", event);
-                        }
-                    }
-                }
-
-                /*
-
-                if let Ok(Some(event)) = state_event.get_field::<String>("type") {
-                    println!("Event type: {}", event);
-                }
-*/
-
-
-            }
-*/
-
-
-            //rooms_state.push(st.room_state);
         }
 
         Some(joined_rooms)
     }
 
-    pub async fn get_room_info(&self, room_id: OwnedRoomId) ->
-    Option<RoomInfo> {
+    pub async fn get_room_event(&self, room_id: OwnedRoomId, event_id: OwnedEventId) -> Option<ruma::serde::Raw<AnyTimelineEvent>> {
 
-        let mut room_info = RoomInfo {
+        let event = self.client
+            .send_request(get_room_event::v3::Request::new(
+                room_id,
+                event_id,
+            ))
+            .await
+            .ok()?;
+
+        Some(event.event)
+    }
+
+    pub async fn get_room_summary(&self, room_id: OwnedRoomId) ->
+    Option<RoomSummary> {
+
+        let mut room_info = RoomSummary {
             room_id: room_id.to_string(),
             ..Default::default()
         };
@@ -273,11 +259,16 @@ impl AppService {
 }
 
 #[derive(Default, Debug, Deserialize, Serialize)]
-pub struct RoomInfo {
+pub struct RoomSummary {
     pub room_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub canonical_alias: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub avatar_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub banner_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub topic: Option<String>,
 }
