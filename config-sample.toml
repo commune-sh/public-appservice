@@ -1,0 +1,15 @@
+[appservice]
+port = 8989
+id = "commune"
+sender_localpart = "public"
+access_token = "appservice-access-token"
+hs_access_token = "homeserver-access-token"
+
+[appservice.rules]
+auto_join = true
+invite_by_local_user = true
+federation_domain_whitelist = ["matrix.org", "localhost:8481"]
+
+[matrix]
+homeserver = "http://localhost:8080"
+server_name = "localhost:8480"
