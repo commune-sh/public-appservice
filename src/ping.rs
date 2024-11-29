@@ -55,7 +55,11 @@ pub async fn ping(
     Json(payload): Json<PingRequest>,
 ) -> Result<impl IntoResponse, AppserviceError> {
 
-    println!("Ping request: {:#?}", payload);
+    let txn_id = payload.transaction_id.clone();
+
+    if !state.transaction_store.verify_and_remove_transaction(&txn_id).await {
+        println!("Transaction ID does not match: {}", txn_id);
+    }
 
     Ok(Json(json!({})))
 }

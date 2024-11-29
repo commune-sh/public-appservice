@@ -107,9 +107,11 @@ impl Server {
         tokio::spawn(async move {
             info!("Pinging homeserver...");
             let txn_id = ping_state.transaction_store.generate_transaction_id().await;
-            println!("Transaction ID: {}", txn_id);
             let ping = ping_state.appservice.ping_homeserver(txn_id.clone()).await;
-            println!("ping: {:#?}", ping);
+            match ping {
+                Ok(_) => info!("Homeserver pinged successfully."),
+                Err(e) => eprintln!("Failed to ping homeserver: {}", e),
+            }
         });
 
         if let Ok(listener) = tokio::net::TcpListener::bind(addr.clone()).await {
