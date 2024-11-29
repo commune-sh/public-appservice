@@ -36,55 +36,61 @@ pub async fn transactions(
         }
     };
 
-
     for event in events {
         println!("Event: {:#?}", event);
 
-        if let Ok(event) =  serde_json::from_value::<RoomMemberEvent>(event.clone()) {
-            let room_id = event.room_id().to_owned();
+        let member_event = if let Ok(event) = serde_json::from_value::<RoomMemberEvent>(event.clone()) {
+            event
+        } else {
+            continue;
+        };
 
-            let membership = event.membership().to_owned();
+        print!("Member Event: {:#?}", member_event);
 
-            let server_name = event.room_id().server_name();
+        let room_id = member_event.room_id().to_owned();
+        let membership = member_event.membership().to_owned();
+        let server_name = member_event.room_id().server_name();
 
-            match server_name {
-                Some(server_name) => {
-                    if server_name.as_str() != state.config.matrix.server_name {
-                        println!("Ignoring event for room on different server: {}", server_name);
+        match server_name {
+            Some(server_name) => {
+                if server_name.as_str() != state.config.matrix.server_name {
+                    // Ignore events for rooms on other servers, if configured to local homeserver
+                    // users
+                    if state.config.appservice.rules.invite_by_local_user {
+                        info!("Ignoring event for room on different server: {}", server_name);
                         continue;
                     }
                 }
-                None => {
-                    println!("Ignoring event for room with no server name");
-                    continue;
-                }
             }
-
-
-            // Ignore membership events for other users
-            let invited_user = event.state_key().to_owned();
-            if invited_user != state.appservice.user_id() {
-                info!("Ignoring event for user: {}", invited_user);
+            None => {
+                info!("Ignoring event for room with no server name");
                 continue;
             }
-
-            match membership {
-                MembershipState::Leave => {
-                    println!("Leaving room: {}", room_id);
-                }
-                MembershipState::Ban => {
-                    println!("Banning user from room: {}", room_id);
-                    state.appservice.leave_room(room_id).await;
-                }
-                MembershipState::Invite => {
-                    println!("Joining room: {}", room_id);
-                    state.appservice.join_room(room_id).await;
-                }
-                _ => {}
-            }
-
-
         }
+
+        // Ignore membership events for other users
+        let invited_user = member_event.state_key().to_owned();
+        if invited_user != state.appservice.user_id() {
+            info!("Ignoring event for user: {}", invited_user);
+            continue;
+        }
+
+        match membership {
+            MembershipState::Invite => {
+                info!("Joining room: {}", room_id);
+                state.appservice.join_room(room_id).await;
+            }
+            MembershipState::Leave => {
+                info!("Left room: {}", room_id);
+            }
+            MembershipState::Ban => {
+                info!("Banned from room: {}", room_id);
+                //state.appservice.leave_room(room_id).await;
+            }
+            _ => {}
+        }
+
+
     }
 
 

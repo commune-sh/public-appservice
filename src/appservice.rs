@@ -4,7 +4,6 @@ use ruma::{
     OwnedRoomId,
     OwnedEventId,
     OwnedUserId,
-    TransactionId,
     OwnedTransactionId,
     UserId,
     api::client::{
@@ -118,6 +117,7 @@ impl AppService {
             ))
             .await
             .ok();
+
         println!("Join room: {:#?}", jr);
     }
 
