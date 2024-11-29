@@ -6,6 +6,7 @@ use axum::{
 };
 
 use std::sync::Arc;
+use tracing::info;
 use hyper_util::{client::legacy::connect::HttpConnector, rt::TokioExecutor};
 
 use anyhow;
@@ -19,8 +20,11 @@ use crate::middleware::{
     validate_room_id,
 };
 
-use crate::api::{
+use crate::ping::{
+    TransactionStore,
     ping,
+};
+use crate::api::{
     transactions,
     matrix_proxy,
 };
@@ -37,6 +41,7 @@ pub struct AppState {
     pub config: Config,
     pub client: Client,
     pub appservice: AppService,
+    pub transaction_store: TransactionStore,
 }
 
 impl Server {
@@ -50,18 +55,21 @@ impl Server {
         hyper_util::client::legacy::Client::<(), ()>::builder(TokioExecutor::new())
             .build(HttpConnector::new());
 
+        let transaction_store = TransactionStore::new();
+
         let state = Arc::new(AppState {
             config: self.config.clone(),
             client,
             appservice: self.appservice.clone(),
+            transaction_store,
         });
 
+        let ping_state = state.clone();
+
         let service_routes = Router::new()
-            //.layer(Extension(state.clone()))
             .route("/ping", post(ping))
             .route("/transactions/:txn_id", put(transactions))
-            .route_layer(middleware::from_fn_with_state(state.clone(), authenticate_homeserver))
-            .with_state(state.clone());
+            .route_layer(middleware::from_fn_with_state(state.clone(), authenticate_homeserver));
 
         let room_routes_inner = Router::new()
             .route("/state", get(matrix_proxy))
@@ -71,22 +79,19 @@ impl Server {
             .route("/aliases", get(matrix_proxy))
             .route("/event/*path", get(matrix_proxy))
             .route("/context/*path", get(matrix_proxy))
-            .route("/timestamp_to_event", get(matrix_proxy))
-            .with_state(state.clone());
+            .route("/timestamp_to_event", get(matrix_proxy));
 
         let room_routes = Router::new()
             .nest("/:room_id", room_routes_inner)
             .route_layer(middleware::from_fn_with_state(state.clone(), validate_public_room))
-            .route_layer(middleware::from_fn_with_state(state.clone(), validate_room_id))
-            .with_state(state.clone());
+            .route_layer(middleware::from_fn_with_state(state.clone(), validate_room_id));
 
         let more_room_routes = Router::new()
             .route("/hierarchy", get(matrix_proxy))
             .route("/threads", get(matrix_proxy))
             .route("/relations/*path", get(matrix_proxy))
             .route_layer(middleware::from_fn_with_state(state.clone(), validate_public_room))
-            .route_layer(middleware::from_fn_with_state(state.clone(), validate_room_id))
-            .with_state(state.clone());
+            .route_layer(middleware::from_fn_with_state(state.clone(), validate_room_id));
 
         let app = Router::new()
             .nest("/_matrix/app/v1", service_routes)
@@ -98,6 +103,14 @@ impl Server {
 
 
         let addr = format!("localhost:{}", port);
+
+        tokio::spawn(async move {
+            info!("Pinging homeserver...");
+            let txn_id = ping_state.transaction_store.generate_transaction_id().await;
+            println!("Transaction ID: {}", txn_id);
+            let ping = ping_state.appservice.ping_homeserver(txn_id.clone()).await;
+            println!("ping: {:#?}", ping);
+        });
 
         if let Ok(listener) = tokio::net::TcpListener::bind(addr.clone()).await {
             axum::serve(listener, app).await?;

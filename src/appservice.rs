@@ -3,8 +3,10 @@ use crate::config::Config;
 use ruma::{
     OwnedRoomId,
     OwnedEventId,
-    UserId,
     OwnedUserId,
+    TransactionId,
+    OwnedTransactionId,
+    UserId,
     api::client::{
         appservice::request_ping,
         alias::get_alias,
@@ -83,11 +85,16 @@ impl AppService {
         })
     }
 
-    pub async fn ping_homeserver(&self) -> Result<(), anyhow::Error> {
+    pub async fn ping_homeserver(&self, id: String) -> Result<(), anyhow::Error> {
+
+        let mut req = request_ping::v1::Request::new(
+            self.appservice_id.to_string()
+        );
+
+        req.transaction_id = Some(OwnedTransactionId::try_from(id)?);
+
         let r = self.client
-            .send_request(request_ping::v1::Request::new(
-                self.appservice_id.to_string()
-            ))
+            .send_request(req)
             .await?;
         println!("Ping response: {:#?}", r);
         Ok(())

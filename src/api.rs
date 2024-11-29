@@ -17,26 +17,11 @@ use axum::{
 use ruma::events::room::member::{RoomMemberEvent, MembershipState};
 
 use serde_json::{Value, json};
-use serde::Deserialize;
 use std::sync::Arc;
 use tracing::info;
 
 use crate::server::AppState;
 use crate::middleware::Data;
-use crate::error::AppserviceError;
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct PingRequest {
-    pub transaction_id: String,
-}
-
-pub async fn ping(
-    State(state): State<Arc<AppState>>,
-    Json(payload): Json<PingRequest>,
-) -> Result<impl IntoResponse, AppserviceError> {
-
-    Ok(Json(json!({})))
-}
 
 pub async fn transactions(
     State(state): State<Arc<AppState>>,

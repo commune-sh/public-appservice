@@ -1,6 +1,7 @@
 pub mod config;
 pub mod appservice;
 pub mod server;
+pub mod ping;
 pub mod api;
 pub mod rooms;
 pub mod middleware;
