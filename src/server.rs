@@ -102,7 +102,7 @@ impl Server {
             .with_state(state);
 
 
-        let addr = format!("localhost:{}", port);
+        let addr = format!("0.0.0.0:{}", port);
 
         tokio::spawn(async move {
             info!("Pinging homeserver...");
