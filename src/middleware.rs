@@ -162,12 +162,8 @@ pub async fn validate_public_room(
 ) -> Result<impl IntoResponse, (StatusCode, Json<Value>)> {
 
     if let Some(room_id) = data.room_id.as_ref() {
-       println!("passed down room id is: {:#?}", room_id);
-
 
         if let Ok(id) = RoomId::parse(room_id) {
-
-            println!("Checking if user is in room: {:#?}", id);
 
             if !state.appservice.has_joined_room(id).await {
                 return Err((

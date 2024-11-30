@@ -4,13 +4,19 @@ use std::{fs, process};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
+    pub server: Server,
     pub appservice: AppService,
     pub matrix: Matrix,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AppService {
+pub struct Server {
     pub port: u16,
+    pub allow_origin: Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AppService {
     pub id: String,
     pub sender_localpart: String,
     pub access_token: String,

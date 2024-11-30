@@ -19,7 +19,7 @@ async fn main() {
 
     info!("Starting Commune public appservice...");
 
-    if let Err(e) = server.run(config.appservice.port.clone()).await {
+    if let Err(e) = server.run(config.server.port.clone()).await {
         eprintln!("Server error: {}", e);
         std::process::exit(1);
     }

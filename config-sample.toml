@@ -1,5 +1,8 @@
-[appservice]
+[server]
 port = 8989
+allow_origin = [""]
+
+[appservice]
 id = "commune"
 sender_localpart = "public"
 access_token = "appservice-access-token"

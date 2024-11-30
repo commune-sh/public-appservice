@@ -2,6 +2,7 @@ use axum::{
     body::Body,
     middleware::{self},
     routing::{get, put, post},
+    http::HeaderValue,
     Router,
 };
 
@@ -53,6 +54,33 @@ impl Server {
         Self { config, appservice }
     }
 
+    pub fn setup_cors(&self) -> CorsLayer {
+
+        /*
+        let origins = match &self.config.server.allow_origin {
+            Some(origins) if !origins.is_empty() && !origins.contains(&"*".to_string()) => 
+                origins.iter().filter_map(|s| s.parse::<HeaderValue>().ok()).collect::<Vec<_>>(),
+        _ => vec![],
+        };
+        */
+
+        let mut layer = CorsLayer::new()
+            .allow_origin(Any)
+            .allow_headers(vec![CONTENT_TYPE]);
+
+        layer = match &self.config.server.allow_origin {
+            Some(origins) if !origins.is_empty() && 
+            !origins.contains(&"".to_string()) &&
+            !origins.contains(&"*".to_string()) => {
+                let origins = origins.iter().filter_map(|s| s.parse::<HeaderValue>().ok()).collect::<Vec<_>>();
+                layer.allow_origin(origins)
+            },
+            _ => layer,
+        };
+
+        layer
+    }
+
     pub async fn run(&self, port: u16) -> Result<(), anyhow::Error> {
 
         let client: Client =
@@ -97,9 +125,7 @@ impl Server {
             .route_layer(middleware::from_fn_with_state(state.clone(), validate_public_room))
             .route_layer(middleware::from_fn_with_state(state.clone(), validate_room_id));
 
-        let cors = CorsLayer::new()
-            .allow_origin(Any)
-            .allow_headers(vec![CONTENT_TYPE]);
+        let cors = self.setup_cors();
 
         let app = Router::new()
             .nest("/_matrix/app/v1", service_routes)
