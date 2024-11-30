@@ -9,6 +9,10 @@ use std::sync::Arc;
 use tracing::info;
 use hyper_util::{client::legacy::connect::HttpConnector, rt::TokioExecutor};
 
+use tower_http::cors::{Any, CorsLayer};
+
+use http::header::CONTENT_TYPE;
+
 use anyhow;
 
 use crate::config::Config;
@@ -93,12 +97,17 @@ impl Server {
             .route_layer(middleware::from_fn_with_state(state.clone(), validate_public_room))
             .route_layer(middleware::from_fn_with_state(state.clone(), validate_room_id));
 
+        let cors = CorsLayer::new()
+            .allow_origin(Any)
+            .allow_headers(vec![CONTENT_TYPE]);
+
         let app = Router::new()
             .nest("/_matrix/app/v1", service_routes)
             .nest("/_matrix/client/v3/rooms", room_routes)
             .nest("/_matrix/client/v1/rooms/:rood_id", more_room_routes)
             .route("/publicRooms", get(public_rooms))
             .route("/", get(index))
+            .layer(cors)
             .with_state(state);
 
 

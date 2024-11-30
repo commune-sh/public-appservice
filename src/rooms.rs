@@ -176,7 +176,7 @@ fn process_rooms(rooms: Vec<JoinedRoomState>) -> Option<Vec<PublicRoom>> {
 
             if event_type == "commune.room.banner" {
                 if let Ok(Some(content)) = state_event.get_field::<RoomAvatarEventContent>("content") {
-                    pub_room.avatar_url = content.url.map(|u| u.to_string());
+                    pub_room.banner_url = content.url.map(|u| u.to_string());
                 };
             }
 
