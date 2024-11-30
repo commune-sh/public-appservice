@@ -11,6 +11,7 @@ use tracing::info;
 use hyper_util::{client::legacy::connect::HttpConnector, rt::TokioExecutor};
 
 use tower_http::cors::{Any, CorsLayer};
+use tower_http::trace::TraceLayer;
 
 use http::header::CONTENT_TYPE;
 
@@ -134,6 +135,7 @@ impl Server {
             .route("/publicRooms", get(public_rooms))
             .route("/", get(index))
             .layer(cors)
+            .layer(TraceLayer::new_for_http())
             .with_state(state);
 
 

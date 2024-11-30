@@ -63,8 +63,7 @@ impl AppService {
             .homeserver_url(config.matrix.homeserver.clone())
             .access_token(Some(config.appservice.access_token.clone()))
             .build::<HttpClient>()
-            .await
-            .unwrap();
+            .await?;
 
         let user_id = UserId::parse(&format!("@{}:{}", config.appservice.sender_localpart, config.matrix.server_name))?;
 
