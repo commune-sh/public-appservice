@@ -7,6 +7,7 @@ pub struct Config {
     pub server: Server,
     pub appservice: AppService,
     pub matrix: Matrix,
+    pub redis: Redis,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -36,6 +37,31 @@ pub struct Matrix {
     pub homeserver: String,
     pub server_name: String,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Redis {
+    pub url: String,
+    #[serde(default = "default_pool_size")]
+    pub pool_size: u32,
+    #[serde(default = "default_timeout_secs")]
+    pub timeout_secs: u64,
+    #[serde(default = "default_cache_ttl")]
+    pub cache_ttl: u64,
+}
+
+fn default_pool_size() -> u32 {
+    10
+}
+
+fn default_timeout_secs() -> u64 {
+    5
+}
+
+fn default_cache_ttl() -> u64 {
+    300 
+}
+
+
 
 impl Config {
     pub fn new() -> Self {

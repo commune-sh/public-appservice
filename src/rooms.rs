@@ -39,11 +39,34 @@ use crate::appservice::{
     RoomSummary
 };
 
+use redis::{
+    AsyncCommands,
+    RedisError
+};
+
 use crate::error::AppserviceError;
+
+use tracing::{info, warn};
 
 pub async fn public_rooms (
     State(state): State<Arc<AppState>>,
 ) -> Result<impl IntoResponse, AppserviceError> {
+
+    let mut redis_conn = state.cache.get_multiplexed_async_connection()
+        .await;
+
+    if let Ok(ref mut redis_conn) = redis_conn {
+        if let Ok(cached_data) = get_cached_rooms(redis_conn).await {
+            info!("Public rooms fetched from cache");
+            return Ok((
+                StatusCode::OK,
+                Json(json!({
+                    "rooms": json!(cached_data),
+                }))
+            ))
+        }
+    }
+
 
     let rooms = state.appservice.joined_rooms_state()
         .await 
@@ -51,6 +74,15 @@ pub async fn public_rooms (
 
 
     let processed = process_rooms(rooms);
+
+    if let Ok(ref mut redis_conn) = redis_conn {
+        if let Err(e) = cache_rooms(redis_conn, &processed).await {
+            warn!("Failed to cache public rooms: {}", e);
+        } else {
+            info!("Public rooms cached");
+        }
+    }
+
 
     Ok((
         StatusCode::OK,
@@ -60,7 +92,35 @@ pub async fn public_rooms (
     ))
 }
 
-#[derive(Default, Serialize)]
+async fn get_cached_rooms(
+    conn: &mut redis::aio::MultiplexedConnection,
+) -> Result<Vec<PublicRoom>, RedisError> {
+    let data: String = conn.get("public_rooms").await?;
+    serde_json::from_str(&data).map_err(|e| {
+        RedisError::from((
+            redis::ErrorKind::IoError,
+            "Deserialization error",
+            e.to_string(),
+        ))
+    })
+}
+
+async fn cache_rooms(
+    conn: &mut redis::aio::MultiplexedConnection,
+    rooms: &Vec<PublicRoom>,
+) -> Result<(), RedisError> {
+    let serialized = serde_json::to_string(rooms).map_err(|e| {
+        RedisError::from((
+            redis::ErrorKind::IoError,
+            "Serialization error",
+            e.to_string(),
+        ))
+    })?;
+
+    conn.set_ex("public_rooms", serialized, 3600).await
+}
+
+#[derive(Default, Serialize, Deserialize)]
 struct PublicRoom {
     room_id: String,
     #[serde(rename = "type")]
@@ -98,7 +158,7 @@ fn is_false(b: &bool) -> bool {
     !*b
 }
 
-fn process_rooms(rooms: Vec<JoinedRoomState>) -> Option<Vec<PublicRoom>> {
+fn process_rooms(rooms: Vec<JoinedRoomState>) -> Vec<PublicRoom> {
 
     let mut public_rooms: Vec<PublicRoom> = Vec::new();
 
@@ -224,7 +284,7 @@ fn process_rooms(rooms: Vec<JoinedRoomState>) -> Option<Vec<PublicRoom>> {
         public_rooms.push(pub_room);
     }
 
-    Some(public_rooms)
+    public_rooms
 }
 
 #[derive(Debug, Deserialize, Serialize)]

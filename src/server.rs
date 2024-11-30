@@ -19,11 +19,13 @@ use anyhow;
 
 use crate::config::Config;
 use crate::appservice::AppService;
+use crate::cache::Cache;
 use crate::rooms::{public_rooms, room_info};
 use crate::middleware::{
     authenticate_homeserver,
     validate_public_room,
     validate_room_id,
+    public_rooms_cache
 };
 
 use crate::ping::{
@@ -40,6 +42,7 @@ type Client = hyper_util::client::legacy::Client<HttpConnector, Body>;
 pub struct Server {
     config: Config,
     appservice: AppService,
+    cache: Cache,
 }
 
 #[derive(Clone)]
@@ -48,22 +51,19 @@ pub struct AppState {
     pub client: Client,
     pub appservice: AppService,
     pub transaction_store: TransactionStore,
+    pub cache: redis::Client,
 }
 
 impl Server {
-    pub fn new(config: Config, appservice: AppService) -> Self {
-        Self { config, appservice }
+    pub fn new(
+        config: Config, 
+        appservice: AppService,
+        cache: Cache,
+    ) -> Self {
+        Self { config, appservice, cache }
     }
 
     pub fn setup_cors(&self) -> CorsLayer {
-
-        /*
-        let origins = match &self.config.server.allow_origin {
-            Some(origins) if !origins.is_empty() && !origins.contains(&"*".to_string()) => 
-                origins.iter().filter_map(|s| s.parse::<HeaderValue>().ok()).collect::<Vec<_>>(),
-        _ => vec![],
-        };
-        */
 
         let mut layer = CorsLayer::new()
             .allow_origin(Any)
@@ -95,6 +95,7 @@ impl Server {
             client,
             appservice: self.appservice.clone(),
             transaction_store,
+            cache: self.cache.client.clone(),
         });
 
         let ping_state = state.clone();
@@ -126,15 +127,17 @@ impl Server {
             .route_layer(middleware::from_fn_with_state(state.clone(), validate_public_room))
             .route_layer(middleware::from_fn_with_state(state.clone(), validate_room_id));
 
-        let cors = self.setup_cors();
+        let public_rooms_route = Router::new()
+            .route("/", get(public_rooms));
+            //.route_layer(middleware::from_fn_with_state(state.clone(), public_rooms_cache));
 
         let app = Router::new()
             .nest("/_matrix/app/v1", service_routes)
             .nest("/_matrix/client/v3/rooms", room_routes)
             .nest("/_matrix/client/v1/rooms/:rood_id", more_room_routes)
-            .route("/publicRooms", get(public_rooms))
+            .nest("/publicRooms", public_rooms_route)
             .route("/", get(index))
-            .layer(cors)
+            .layer(self.setup_cors())
             .layer(TraceLayer::new_for_http())
             .with_state(state);
 

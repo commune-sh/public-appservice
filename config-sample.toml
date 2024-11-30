@@ -16,3 +16,9 @@ federation_domain_whitelist = ["matrix.org", "localhost:8481"]
 [matrix]
 homeserver = "http://localhost:8080"
 server_name = "localhost:8480"
+
+[redis]
+url = "127.0.0.1:6379"
+pool_size = 20
+timeout_secs = 5
+cache_ttl = 300

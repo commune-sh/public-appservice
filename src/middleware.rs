@@ -181,3 +181,21 @@ pub async fn validate_public_room(
 }
 
 
+pub async fn public_rooms_cache(
+    Path(params): Path<Vec<(String, String)>>,
+    State(state): State<Arc<AppState>>,
+    mut req: Request<Body>,
+    next: Next,
+) -> Result<impl IntoResponse, (StatusCode, Json<Value>)> {
+
+    println!("Public Rooms Cache Middleware");
+
+                Ok((
+                    StatusCode::FORBIDDEN,
+                    Json(json!({
+                        "errcode": "NOT_IN_ROOM",
+                        "error": "User is not in room"
+                    }))
+                ))
+}
+

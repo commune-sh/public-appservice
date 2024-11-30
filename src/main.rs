@@ -2,6 +2,7 @@ use public_appservice::*;
 use config::Config;
 use appservice::AppService;
 use server::Server;
+use cache::Cache;
 
 use tracing::info;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -20,7 +21,14 @@ async fn main() {
             std::process::exit(1);
         });
 
-    let server = Server::new(config.clone(), appservice.clone());
+    let cache = Cache::new(&config)
+        .await
+        .unwrap_or_else(|e| {
+            eprintln!("Can't connect to Redis: {}", e);
+            std::process::exit(1);
+        });
+
+    let server = Server::new(config.clone(), appservice.clone(), cache);
 
     info!("Starting Commune public appservice...");
 
