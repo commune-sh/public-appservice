@@ -25,7 +25,6 @@ use crate::middleware::{
     authenticate_homeserver,
     validate_public_room,
     validate_room_id,
-    public_rooms_cache
 };
 
 use crate::ping::{

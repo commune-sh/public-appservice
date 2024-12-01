@@ -106,9 +106,6 @@ pub async fn validate_room_id(
         }
 
 
-
-
-
         if let Some(path) = req.extensions().get::<MatchedPath>() {
             let pattern = path.as_str();
             
@@ -179,23 +176,3 @@ pub async fn validate_public_room(
 
     Ok(next.run(req).await)
 }
-
-
-pub async fn public_rooms_cache(
-    Path(params): Path<Vec<(String, String)>>,
-    State(state): State<Arc<AppState>>,
-    mut req: Request<Body>,
-    next: Next,
-) -> Result<impl IntoResponse, (StatusCode, Json<Value>)> {
-
-    println!("Public Rooms Cache Middleware");
-
-                Ok((
-                    StatusCode::FORBIDDEN,
-                    Json(json!({
-                        "errcode": "NOT_IN_ROOM",
-                        "error": "User is not in room"
-                    }))
-                ))
-}
-

@@ -129,9 +129,11 @@ pub async fn matrix_proxy(
 
     req.headers_mut().insert(AUTHORIZATION, auth_value);
 
-    Ok(state.client
+    let response = state.client
         .request(req)
         .await
         .map_err(|_| StatusCode::BAD_REQUEST)?
-        .into_response())
+        .into_response();
+        
+    Ok(response)
 }

@@ -39,9 +39,9 @@ use crate::appservice::{
     RoomSummary
 };
 
-use redis::{
-    AsyncCommands,
-    RedisError
+use crate::cache::{
+    get_cached_rooms,
+    cache_rooms
 };
 
 use crate::error::AppserviceError;
@@ -67,7 +67,6 @@ pub async fn public_rooms (
         }
     }
 
-
     let rooms = state.appservice.joined_rooms_state()
         .await 
         .map_err(|_| AppserviceError::MatrixError("Failed to fetch rooms".to_string()))?;
@@ -75,14 +74,17 @@ pub async fn public_rooms (
 
     let processed = process_rooms(rooms);
 
-    if let Ok(ref mut redis_conn) = redis_conn {
-        if let Err(e) = cache_rooms(redis_conn, &processed).await {
-            warn!("Failed to cache public rooms: {}", e);
-        } else {
-            info!("Public rooms cached");
-        }
-    }
+    let to_cache = processed.clone();
 
+    tokio::spawn(async move {
+        if let Ok(ref mut redis_conn) = redis_conn {
+            if let Err(e) = cache_rooms(redis_conn, &to_cache).await {
+                warn!("Failed to cache public rooms: {}", e);
+            } else {
+                info!("Public rooms cached");
+            }
+        }
+    });
 
     Ok((
         StatusCode::OK,
@@ -92,36 +94,8 @@ pub async fn public_rooms (
     ))
 }
 
-async fn get_cached_rooms(
-    conn: &mut redis::aio::MultiplexedConnection,
-) -> Result<Vec<PublicRoom>, RedisError> {
-    let data: String = conn.get("public_rooms").await?;
-    serde_json::from_str(&data).map_err(|e| {
-        RedisError::from((
-            redis::ErrorKind::IoError,
-            "Deserialization error",
-            e.to_string(),
-        ))
-    })
-}
-
-async fn cache_rooms(
-    conn: &mut redis::aio::MultiplexedConnection,
-    rooms: &Vec<PublicRoom>,
-) -> Result<(), RedisError> {
-    let serialized = serde_json::to_string(rooms).map_err(|e| {
-        RedisError::from((
-            redis::ErrorKind::IoError,
-            "Serialization error",
-            e.to_string(),
-        ))
-    })?;
-
-    conn.set_ex("public_rooms", serialized, 3600).await
-}
-
-#[derive(Default, Serialize, Deserialize)]
-struct PublicRoom {
+#[derive(Clone, Default, Serialize, Deserialize)]
+pub struct PublicRoom {
     room_id: String,
     #[serde(rename = "type")]
     #[serde(skip_serializing_if = "Option::is_none")]
