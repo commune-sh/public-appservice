@@ -81,7 +81,7 @@ impl Server {
         layer
     }
 
-    pub async fn run(&self, port: u16) -> Result<(), anyhow::Error> {
+    pub async fn run(&self) -> Result<(), anyhow::Error> {
 
         let client: Client =
         hyper_util::client::legacy::Client::<(), ()>::builder(TokioExecutor::new())
@@ -141,7 +141,7 @@ impl Server {
             .with_state(state);
 
 
-        let addr = format!("0.0.0.0:{}", port);
+        let addr = format!("0.0.0.0:{}", self.config.server.port);
 
         tokio::spawn(async move {
             info!("Pinging homeserver...");
