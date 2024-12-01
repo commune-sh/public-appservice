@@ -3,7 +3,9 @@ use axum::{
     middleware::{self},
     routing::{get, put, post},
     http::HeaderValue,
+    extract::Request,
     Router,
+    ServiceExt
 };
 
 use std::sync::Arc;
@@ -12,6 +14,9 @@ use hyper_util::{client::legacy::connect::HttpConnector, rt::TokioExecutor};
 
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
+use tower_http::normalize_path::NormalizePathLayer;
+use tower::Layer;
+
 
 use http::header::CONTENT_TYPE;
 
@@ -140,6 +145,8 @@ impl Server {
             .layer(TraceLayer::new_for_http())
             .with_state(state);
 
+        let app = NormalizePathLayer::trim_trailing_slash()
+            .layer(app);
 
         let addr = format!("0.0.0.0:{}", self.config.server.port);
 
@@ -154,7 +161,7 @@ impl Server {
         });
 
         if let Ok(listener) = tokio::net::TcpListener::bind(addr.clone()).await {
-            axum::serve(listener, app).await?;
+            axum::serve(listener, ServiceExt::<Request>::into_make_service(app)).await?;
         } else {
             eprintln!("Failed to bind to address: {}", addr);
             std::process::exit(1);

@@ -30,16 +30,17 @@ async fn main() {
 
     info!("Starting Commune public appservice...");
 
-    if let Err(e) = Server::new(
-            config.clone(), 
-            appservice.clone(), 
-            cache
-        )
-        .run()
-        .await {
+    Server::new(
+        config.clone(), 
+        appservice.clone(), 
+        cache
+    )
+    .run()
+    .await 
+    .unwrap_or_else(|e| {
         eprintln!("Server error: {}", e);
         std::process::exit(1);
-    }
+    }); 
 
 }
 

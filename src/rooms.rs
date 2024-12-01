@@ -310,7 +310,6 @@ pub async fn room_info (
 
     let summary =  state.appservice.get_room_summary(parsed_id.clone())
         .await.ok_or(AppserviceError::MatrixError("Room not found".to_string()))?;
-
     let mut info = RoomInfo {
         info: summary,
         room: None,
