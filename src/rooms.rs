@@ -33,7 +33,7 @@ use serde_json::{
 
 use std::sync::Arc;
 
-use crate::server::AppState;
+use crate::AppState;
 use crate::appservice::{
     JoinedRoomState,
     RoomSummary

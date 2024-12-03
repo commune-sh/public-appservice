@@ -30,7 +30,7 @@ use serde_json::{
 
 use std::sync::Arc;
 
-use crate::server::AppState;
+use crate::AppState;
 use crate::utils::is_room_id_ok;
 
 pub async fn authenticate_homeserver(

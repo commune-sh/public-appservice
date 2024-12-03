@@ -20,7 +20,7 @@ use serde_json::{Value, json};
 use std::sync::Arc;
 use tracing::info;
 
-use crate::server::AppState;
+use crate::AppState;
 use crate::middleware::Data;
 
 pub async fn transactions(

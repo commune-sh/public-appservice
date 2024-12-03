@@ -11,7 +11,7 @@ use uuid::Uuid;
 use serde_json::json;
 use serde::Deserialize;
 
-use crate::server::AppState;
+use crate::AppState;
 use crate::error::AppserviceError;
 
 #[derive(Debug, Clone)]

@@ -41,7 +41,7 @@ use crate::api::{
     matrix_proxy,
 };
 
-type Client = hyper_util::client::legacy::Client<HttpConnector, Body>;
+pub type Client = hyper_util::client::legacy::Client<HttpConnector, Body>;
 
 pub struct Server {
     config: Config,
@@ -49,14 +49,7 @@ pub struct Server {
     cache: Cache,
 }
 
-#[derive(Clone)]
-pub struct AppState {
-    pub config: Config,
-    pub client: Client,
-    pub appservice: AppService,
-    pub transaction_store: TransactionStore,
-    pub cache: redis::Client,
-}
+pub use crate::AppState;
 
 impl Server {
     pub fn new(
