@@ -9,7 +9,6 @@ use axum::{
 
 use std::sync::Arc;
 use tracing::info;
-use hyper_util::{client::legacy::connect::HttpConnector, rt::TokioExecutor};
 
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
@@ -22,8 +21,6 @@ use http::header::CONTENT_TYPE;
 use anyhow;
 
 use crate::config::Config;
-use crate::appservice::AppService;
-use crate::cache::Cache;
 use crate::rooms::{public_rooms, room_info};
 use crate::middleware::{
     authenticate_homeserver,
@@ -31,42 +28,34 @@ use crate::middleware::{
     validate_room_id,
 };
 
-use crate::ping::{
-    TransactionStore,
-    ping,
-};
+use crate::ping::ping;
+
 use crate::api::{
     transactions,
     matrix_proxy,
 };
 
-use crate::ProxyClient;
-
-pub struct Server {
-    config: Config,
-    appservice: AppService,
-    cache: Cache,
+pub struct Server{
+    state: Arc<AppState>,
 }
 
 pub use crate::AppState;
 
 impl Server {
 
-    pub fn new(
-        config: Config, 
-        appservice: AppService,
-        cache: Cache,
-    ) -> Self {
-        Self { config, appservice, cache }
+    pub fn new(state: Arc<AppState>) -> Self {
+        Self {
+            state
+        }
     }
 
-    pub fn setup_cors(&self) -> CorsLayer {
+    pub fn setup_cors(&self, config: &Config) -> CorsLayer {
 
         let mut layer = CorsLayer::new()
             .allow_origin(Any)
             .allow_headers(vec![CONTENT_TYPE]);
 
-        layer = match &self.config.server.allow_origin {
+        layer = match &config.server.allow_origin {
             Some(origins) if !origins.is_empty() && 
             !origins.contains(&"".to_string()) &&
             !origins.contains(&"*".to_string()) => {
@@ -80,27 +69,14 @@ impl Server {
     }
 
     pub async fn run(&self) -> Result<(), anyhow::Error> {
+        let ping_state = self.state.clone();
 
-        let client: ProxyClient =
-        hyper_util::client::legacy::Client::<(), ()>::builder(TokioExecutor::new())
-            .build(HttpConnector::new());
-
-        let transaction_store = TransactionStore::new();
-
-        let state = Arc::new(AppState {
-            config: self.config.clone(),
-            proxy: client,
-            appservice: self.appservice.clone(),
-            transaction_store,
-            cache: self.cache.client.clone(),
-        });
-
-        let ping_state = state.clone();
+        let addr = format!("0.0.0.0:{}", &self.state.config.server.port);
 
         let service_routes = Router::new()
             .route("/ping", post(ping))
             .route("/transactions/:txn_id", put(transactions))
-            .route_layer(middleware::from_fn_with_state(state.clone(), authenticate_homeserver));
+            .route_layer(middleware::from_fn_with_state(self.state.clone(), authenticate_homeserver));
 
         let room_routes_inner = Router::new()
             .route("/state", get(matrix_proxy))
@@ -114,19 +90,19 @@ impl Server {
 
         let room_routes = Router::new()
             .nest("/:room_id", room_routes_inner)
-            .route_layer(middleware::from_fn_with_state(state.clone(), validate_public_room))
-            .route_layer(middleware::from_fn_with_state(state.clone(), validate_room_id));
+            .route_layer(middleware::from_fn_with_state(self.state.clone(), validate_public_room))
+            .route_layer(middleware::from_fn_with_state(self.state.clone(), validate_room_id));
 
         let more_room_routes = Router::new()
             .route("/hierarchy", get(matrix_proxy))
             .route("/threads", get(matrix_proxy))
             .route("/relations/*path", get(matrix_proxy))
-            .route_layer(middleware::from_fn_with_state(state.clone(), validate_public_room))
-            .route_layer(middleware::from_fn_with_state(state.clone(), validate_room_id));
+            .route_layer(middleware::from_fn_with_state(self.state.clone(), validate_public_room))
+            .route_layer(middleware::from_fn_with_state(self.state.clone(), validate_room_id));
 
         let public_rooms_route = Router::new()
             .route("/", get(public_rooms));
-            //.route_layer(middleware::from_fn_with_state(state.clone(), public_rooms_cache));
+            //.route_layer(middleware::from_fn_with_state(self.state.clone(), public_rooms_cache));
 
         let app = Router::new()
             .nest("/_matrix/app/v1", service_routes)
@@ -134,14 +110,13 @@ impl Server {
             .nest("/_matrix/client/v1/rooms/:rood_id", more_room_routes)
             .nest("/publicRooms", public_rooms_route)
             .route("/", get(index))
-            .layer(self.setup_cors())
+            .layer(self.setup_cors(&self.state.config))
             .layer(TraceLayer::new_for_http())
-            .with_state(state);
+            .with_state(self.state.clone());
 
         let app = NormalizePathLayer::trim_trailing_slash()
             .layer(app);
 
-        let addr = format!("0.0.0.0:{}", self.config.server.port);
 
         tokio::spawn(async move {
             info!("Pinging homeserver...");

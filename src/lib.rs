@@ -9,6 +9,7 @@ pub mod cache;
 pub mod error;
 pub mod utils;
 
+use std::sync::Arc;
 use axum::body::Body;
 use hyper_util::{client::legacy::connect::HttpConnector, rt::TokioExecutor};
 
@@ -24,22 +25,23 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub async fn new(config: config::Config) -> Result<Self, anyhow::Error> {
+    pub async fn new(config: config::Config) -> Result<Arc<Self>, anyhow::Error> {
         let client: ProxyClient =
             hyper_util::client::legacy::Client::<(), ()>::builder(TokioExecutor::new())
                 .build(HttpConnector::new());
 
         let appservice = appservice::AppService::new(&config).await?;
+
         let cache = cache::Cache::new(&config).await?;
 
         let transaction_store = ping::TransactionStore::new();
 
-        Ok(Self {
+        Ok(Arc::new(Self {
             config,
             proxy: client,
             appservice,
             transaction_store,
             cache: cache.client,
-        })
+        }))
     }
 }
