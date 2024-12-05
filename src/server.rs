@@ -1,5 +1,4 @@
 use axum::{
-    body::Body,
     middleware::{self},
     routing::{get, put, post},
     http::HeaderValue,
@@ -41,7 +40,7 @@ use crate::api::{
     matrix_proxy,
 };
 
-pub type Client = hyper_util::client::legacy::Client<HttpConnector, Body>;
+use crate::ProxyClient;
 
 pub struct Server {
     config: Config,
@@ -52,6 +51,7 @@ pub struct Server {
 pub use crate::AppState;
 
 impl Server {
+
     pub fn new(
         config: Config, 
         appservice: AppService,
@@ -81,7 +81,7 @@ impl Server {
 
     pub async fn run(&self) -> Result<(), anyhow::Error> {
 
-        let client: Client =
+        let client: ProxyClient =
         hyper_util::client::legacy::Client::<(), ()>::builder(TokioExecutor::new())
             .build(HttpConnector::new());
 
@@ -89,7 +89,7 @@ impl Server {
 
         let state = Arc::new(AppState {
             config: self.config.clone(),
-            client,
+            proxy: client,
             appservice: self.appservice.clone(),
             transaction_store,
             cache: self.cache.client.clone(),

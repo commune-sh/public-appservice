@@ -4,8 +4,19 @@ use appservice::AppService;
 use server::Server;
 use cache::Cache;
 
+use std::sync::Arc;
+
 use tracing::info;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+
+use crate::{AppState, ProxyClient};
+use hyper_util::{client::legacy::connect::HttpConnector, rt::TokioExecutor};
+
+use crate::ping::{
+    TransactionStore,
+    ping,
+};
+
 
 #[tokio::main]
 async fn main() {
@@ -42,6 +53,30 @@ async fn main() {
         std::process::exit(1);
     }); 
 
+}
+
+pub fn new_state(
+    config: Config, 
+    appservice: AppService,
+    cache: Cache,
+) -> Result<Arc<AppState>, anyhow::Error> {
+
+    let client: ProxyClient =
+    hyper_util::client::legacy::Client::<(), ()>::builder(TokioExecutor::new())
+        .build(HttpConnector::new());
+
+
+    let transaction_store = TransactionStore::new();
+
+    let state = Arc::new(AppState {
+        config: config.clone(),
+        proxy: client,
+        appservice: appservice.clone(),
+        transaction_store,
+        cache: cache.client.clone(),
+    });
+
+    Ok(state)
 }
 
 pub fn setup_tracing() {
