@@ -12,10 +12,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use crate::{AppState, ProxyClient};
 use hyper_util::{client::legacy::connect::HttpConnector, rt::TokioExecutor};
 
-use crate::ping::{
-    TransactionStore,
-    ping,
-};
+use crate::ping::TransactionStore;
 
 
 #[tokio::main]

@@ -23,3 +23,23 @@ pub struct AppState {
     pub cache: redis::Client,
 }
 
+impl AppState {
+    pub async fn new(config: config::Config) -> Result<Self, anyhow::Error> {
+        let client: ProxyClient =
+            hyper_util::client::legacy::Client::<(), ()>::builder(TokioExecutor::new())
+                .build(HttpConnector::new());
+
+        let appservice = appservice::AppService::new(&config).await?;
+        let cache = cache::Cache::new(&config).await?;
+
+        let transaction_store = ping::TransactionStore::new();
+
+        Ok(Self {
+            config,
+            proxy: client,
+            appservice,
+            transaction_store,
+            cache: cache.client,
+        })
+    }
+}
