@@ -8,6 +8,7 @@ pub struct Config {
     pub appservice: AppService,
     pub matrix: Matrix,
     pub redis: Redis,
+    pub cache: Cache,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -61,6 +62,18 @@ fn default_cache_ttl() -> u64 {
     300 
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Cache {
+    pub public_rooms: CacheOptions,
+    pub room_state: CacheOptions,
+    pub messages: CacheOptions,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CacheOptions {
+    pub enabled: bool,
+    pub expire_after: u64,
+}
 
 
 impl Config {

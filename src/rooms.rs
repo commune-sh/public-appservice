@@ -52,18 +52,21 @@ pub async fn public_rooms (
     State(state): State<Arc<AppState>>,
 ) -> Result<impl IntoResponse, AppserviceError> {
 
-    let mut redis_conn = state.cache.get_multiplexed_async_connection()
-        .await;
+    // read from cache if enabled
+    if state.config.cache.public_rooms.enabled {
+        let mut redis_conn = state.cache.get_multiplexed_async_connection()
+            .await;
 
-    if let Ok(ref mut redis_conn) = redis_conn {
-        if let Ok(cached_data) = get_cached_rooms(redis_conn).await {
-            info!("Public rooms fetched from cache");
-            return Ok((
-                StatusCode::OK,
-                Json(json!({
-                    "rooms": json!(cached_data),
-                }))
-            ))
+        if let Ok(ref mut redis_conn) = redis_conn {
+            if let Ok(cached_data) = get_cached_rooms(redis_conn).await {
+                info!("Public rooms fetched from cache");
+                return Ok((
+                    StatusCode::OK,
+                    Json(json!({
+                        "rooms": json!(cached_data),
+                    }))
+                ))
+            }
         }
     }
 
@@ -76,15 +79,21 @@ pub async fn public_rooms (
 
     let to_cache = processed.clone();
 
-    tokio::spawn(async move {
-        if let Ok(ref mut redis_conn) = redis_conn {
-            if let Err(e) = cache_rooms(redis_conn, &to_cache).await {
-                warn!("Failed to cache public rooms: {}", e);
-            } else {
-                info!("Public rooms cached");
+    // cache public rooms if enabled
+    if state.config.cache.public_rooms.enabled {
+        tokio::spawn(async move {
+            let mut redis_conn = state.cache.get_multiplexed_async_connection()
+                .await;
+
+            if let Ok(ref mut redis_conn) = redis_conn {
+                if let Err(e) = cache_rooms(redis_conn, &to_cache).await {
+                    warn!("Failed to cache public rooms: {}", e);
+                } else {
+                    info!("Public rooms cached");
+                }
             }
-        }
-    });
+        });
+    }
 
     Ok((
         StatusCode::OK,
