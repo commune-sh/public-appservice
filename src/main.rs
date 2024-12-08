@@ -12,7 +12,9 @@ async fn main() {
 
     setup_tracing();
 
-    let config = Config::new();
+    let args = Args::build();
+
+    let config = Config::new(&args.config);
 
     let state = AppState::new(config.clone())
         .await

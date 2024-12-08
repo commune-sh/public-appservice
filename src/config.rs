@@ -1,5 +1,6 @@
 use serde::{Serialize, Deserialize};
 use std::{fs, process};
+use std::path::Path;
 
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -84,29 +85,25 @@ pub struct CacheOptions {
 
 
 impl Config {
-    pub fn new() -> Self {
-        read()
-    }
+    pub fn new(path: impl AsRef<Path>) -> Self {
 
-    pub fn print(&self) {
-        println!("{:#?}", self);
-    }
-}
+        let path = path.as_ref();
 
-pub fn read() -> Config {
-    let config_content = match fs::read_to_string("config.toml") {
-        Ok(content) => content,
-        Err(e) => {
-            eprintln!("Failed to read config.toml: {}", e);
-            process::exit(1);
-        }
-    };
-    
-    match toml::from_str(&config_content) {
-        Ok(config) => config,
-        Err(e) => {
-            eprintln!("Failed to parse config.toml: {}", e);
-            process::exit(1);
+        let config_content = match fs::read_to_string(path) {
+            Ok(content) => content,
+            Err(e) => {
+                eprintln!("Failed to read config.toml: {}", e);
+                process::exit(1);
+            }
+        };
+        
+        match toml::from_str(&config_content) {
+            Ok(config) => config,
+            Err(e) => {
+                eprintln!("Failed to parse config.toml: {}", e);
+                process::exit(1);
+            }
         }
     }
 }
+
