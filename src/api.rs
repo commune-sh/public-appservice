@@ -14,7 +14,10 @@ use axum::{
     Extension,
 };
 
-use ruma::events::room::member::{RoomMemberEvent, MembershipState};
+use ruma::events::room::{
+    member::{RoomMemberEvent, MembershipState},
+    history_visibility::{RoomHistoryVisibilityEvent, HistoryVisibility},
+};
 
 use serde_json::{Value, json};
 use std::sync::Arc;
@@ -38,6 +41,24 @@ pub async fn transactions(
 
     for event in events {
         println!("Event: {:#?}", event);
+
+        // If auto-join is enabled, join rooms with world_readable history visibility
+        if state.config.appservice.rules.auto_join {
+            if let Ok(event) = serde_json::from_value::<RoomHistoryVisibilityEvent>(event.clone()) {
+                match event.history_visibility() {
+                    HistoryVisibility::WorldReadable => {
+                        println!("History Visibility: World Readable");
+
+                        let room_id = event.room_id().to_owned();
+                        info!("Joining room: {}", room_id);
+                        state.appservice.join_room(room_id).await;
+
+                        return Ok(Json(json!({})))
+                    }
+                    _ => {}
+                }
+            }
+        };
 
         let member_event = if let Ok(event) = serde_json::from_value::<RoomMemberEvent>(event.clone()) {
             event
