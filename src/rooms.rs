@@ -3,6 +3,7 @@ use axum::{
     http::StatusCode,
     response::IntoResponse,
     Json,
+    Extension
 };
 
 use ruma::{
@@ -38,6 +39,8 @@ use crate::appservice::{
     JoinedRoomState,
     RoomSummary
 };
+
+use crate::middleware::Data;
 
 use crate::cache::{
     get_cached_rooms,
@@ -284,8 +287,6 @@ struct CommuneRoomType {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct RoomInfoOptions {
-    #[serde(skip_deserializing)]
-    room_id: String,
     pub child_room: Option<String>,
     pub event_id: Option<String>,
 }
@@ -312,15 +313,20 @@ pub struct Sender {
 
 pub async fn room_info (
     Path(params): Path<Vec<(String, String)>>,
+    Extension(data): Extension<Data>,
     Query(query): Query<RoomInfoOptions>,
     State(state): State<Arc<AppState>>,
 ) -> Result<impl IntoResponse, AppserviceError> {
 
-    let room_id = params[0].1.clone();
+    let mut room_id = params[0].1.clone();
+
+    if let Some(id) = data.room_id.as_ref() {
+        room_id = id.to_string();
+    }
 
     println!("query: {:#?}", query);
 
-    let parsed_id = RoomId::parse(&room_id)
+    let mut parsed_id = RoomId::parse(&room_id)
         .map_err(|_| AppserviceError::MatrixError("Invalid room ID".to_string()))?;
 
     let summary =  state.appservice.get_room_summary(parsed_id.clone())
@@ -332,6 +338,22 @@ pub async fn room_info (
         sender: None,
     };
 
+    if let Some(child_room_id) = query.child_room {
+
+        let parsed_room_id = RoomId::parse(&child_room_id)
+            .map_err(|_| AppserviceError::MatrixError("Invalid child room ID".to_string()))?;
+        parsed_id = parsed_room_id;
+
+
+        println!("child_room_id: {:#?}", child_room_id);
+
+
+        let summary =  state.appservice.get_room_summary(parsed_id.clone())
+            .await.ok_or(AppserviceError::MatrixError("Child room not found".to_string()))?;
+
+        info.room = Some(summary);
+
+    }
 
     if let Some(event_id) = query.event_id {
         let parsed_event_id = EventId::parse(&event_id)

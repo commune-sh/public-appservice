@@ -20,7 +20,8 @@ use ruma::{
             join_room_by_id, 
             leave_room
         },
-        profile::get_profile
+        profile::get_profile,
+        space::{get_hierarchy, SpaceHierarchyRoomsChunk}
     },
     events::{
         AnyTimelineEvent,
@@ -301,6 +302,18 @@ impl AppService {
         }
 
         Some(room_info)
+    }
+
+    pub async fn get_room_hierarchy(&self, room_id: OwnedRoomId) -> Option<Vec<SpaceHierarchyRoomsChunk>> {
+
+        let hierarchy = self.client
+            .send_request(get_hierarchy::v1::Request::new(
+                room_id
+            ))
+            .await
+            .ok()?;
+
+        Some(hierarchy.rooms)
     }
 
 }
