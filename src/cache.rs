@@ -35,6 +35,7 @@ pub async fn get_cached_rooms(
 pub async fn cache_rooms(
     conn: &mut redis::aio::MultiplexedConnection,
     rooms: &Vec<PublicRoom>,
+    ttl: u64,
 ) -> Result<(), RedisError> {
     let serialized = serde_json::to_string(rooms).map_err(|e| {
         RedisError::from((
@@ -44,7 +45,7 @@ pub async fn cache_rooms(
         ))
     })?;
 
-    conn.set_ex("public_rooms", serialized, 3600).await
+    conn.set_ex("public_rooms", serialized, ttl).await
 }
 
 pub async fn get_cached_room_state(

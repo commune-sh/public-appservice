@@ -86,7 +86,11 @@ pub async fn public_rooms (
                 .await;
 
             if let Ok(ref mut redis_conn) = redis_conn {
-                if let Err(e) = cache_rooms(redis_conn, &to_cache).await {
+                if let Err(e) = cache_rooms(
+                    redis_conn, 
+                    &to_cache,
+                    state.config.cache.public_rooms.expire_after
+                ).await {
                     warn!("Failed to cache public rooms: {}", e);
                 } else {
                     info!("Public rooms cached");

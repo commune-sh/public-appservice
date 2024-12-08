@@ -62,6 +62,11 @@ fn default_cache_ttl() -> u64 {
     300 
 }
 
+fn default_false() -> bool {
+    false
+}
+
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Cache {
     pub public_rooms: CacheOptions,
@@ -71,7 +76,9 @@ pub struct Cache {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CacheOptions {
+    #[serde(default = "default_false")]
     pub enabled: bool,
+    #[serde(default = "default_cache_ttl")]
     pub expire_after: u64,
 }
 
