@@ -43,6 +43,8 @@ use crate::appservice::{
 
 use crate::middleware::Data;
 
+use crate::utils;
+
 use crate::cache::{
     get_cached_rooms,
     cache_rooms
@@ -341,36 +343,28 @@ pub async fn room_info (
 
     if let Some(alias) = query.child_room {
 
-        let mut child_room_id = alias.clone();
+        let hierarchy = state.appservice.get_room_hierarchy(parsed_id.clone()).await;
 
-        let server_name = state.config.matrix.server_name.clone();
-        let raw_alias = format!("#{}:{}", alias, server_name);
+        if let Some(hierarchy) = hierarchy {
+            for room in hierarchy {
 
-        if let Ok(alias) = RoomAliasId::parse(&raw_alias) {
-            let id = state.appservice.room_id_from_alias(alias).await;
-            match id {
-                Some(id) => {
-                    println!("Fetched Room ID: {:#?}", id);
-                    child_room_id = id.to_string();
+                if let Some(name) = room.name.as_ref() {
+                    let slug = utils::slugify(name);
+
+                    if slug == alias {
+                        parsed_id = room.room_id.clone();
+
+                        let summary =  state.appservice.get_room_summary(parsed_id.clone())
+                            .await.ok_or(AppserviceError::MatrixError("Room not found".to_string()))?;
+
+                        info.room = Some(summary);
+                        break;
+                    }
+
                 }
-                None => {
-                    println!("Failed to get room ID from alias: {}", raw_alias);
-                }
+
             }
         }
-
-        let parsed_room_id = RoomId::parse(&child_room_id)
-            .map_err(|_| AppserviceError::MatrixError("Invalid child room ID".to_string()))?;
-        parsed_id = parsed_room_id;
-
-
-        println!("child_room_id: {:#?}", child_room_id);
-
-
-        let summary =  state.appservice.get_room_summary(parsed_id.clone())
-            .await.ok_or(AppserviceError::MatrixError("Child room not found".to_string()))?;
-
-        info.room = Some(summary);
 
     }
 

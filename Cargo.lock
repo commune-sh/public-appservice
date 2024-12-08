@@ -1152,6 +1152,7 @@ dependencies = [
  "hyper",
  "hyper-util",
  "redis",
+ "regex",
  "reqwest",
  "ruma",
  "serde",

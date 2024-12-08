@@ -290,7 +290,7 @@ impl AppService {
 
             if event_type == "commune.room.banner" {
                 if let Ok(Some(content)) = state_event.get_field::<RoomAvatarEventContent>("content") {
-                    room_info.avatar_url = content.url.map(|u| u.to_string());
+                    room_info.banner_url = content.url.map(|u| u.to_string());
                 };
             }
 

@@ -1,3 +1,5 @@
+use regex::Regex;
+
 use ruma::{
     RoomId, 
     OwnedRoomId
@@ -31,4 +33,10 @@ pub fn is_room_id_ok(room_id: &str, server_name: &str) -> Result<OwnedRoomId, St
 
         Err(err) => Err(format!("Failed to parse Room ID: {}", err)),
     }
+}
+
+
+pub fn slugify(s: &str) -> String {
+    let re = Regex::new(r"[^a-zA-Z0-9]+").unwrap();
+    re.replace_all(s, "-").to_string().to_lowercase()
 }
