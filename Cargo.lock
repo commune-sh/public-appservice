@@ -1151,6 +1151,7 @@ dependencies = [
  "http",
  "hyper",
  "hyper-util",
+ "once_cell",
  "redis",
  "regex",
  "reqwest",

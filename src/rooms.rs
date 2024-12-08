@@ -8,7 +8,6 @@ use axum::{
 
 use ruma::{
     RoomId,
-    RoomAliasId,
     EventId,
     MilliSecondsSinceUnixEpoch,
     OwnedMxcUri,
