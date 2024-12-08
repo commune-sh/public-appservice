@@ -8,6 +8,7 @@ use axum::{
 
 use ruma::{
     RoomId,
+    RoomAliasId,
     EventId,
     MilliSecondsSinceUnixEpoch,
     OwnedMxcUri,
@@ -338,7 +339,25 @@ pub async fn room_info (
         sender: None,
     };
 
-    if let Some(child_room_id) = query.child_room {
+    if let Some(alias) = query.child_room {
+
+        let mut child_room_id = alias.clone();
+
+        let server_name = state.config.matrix.server_name.clone();
+        let raw_alias = format!("#{}:{}", alias, server_name);
+
+        if let Ok(alias) = RoomAliasId::parse(&raw_alias) {
+            let id = state.appservice.room_id_from_alias(alias).await;
+            match id {
+                Some(id) => {
+                    println!("Fetched Room ID: {:#?}", id);
+                    child_room_id = id.to_string();
+                }
+                None => {
+                    println!("Failed to get room ID from alias: {}", raw_alias);
+                }
+            }
+        }
 
         let parsed_room_id = RoomId::parse(&child_room_id)
             .map_err(|_| AppserviceError::MatrixError("Invalid child room ID".to_string()))?;
