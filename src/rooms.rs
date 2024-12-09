@@ -20,7 +20,7 @@ use ruma::{
             avatar::RoomAvatarEventContent,
             topic::RoomTopicEventContent,
             history_visibility::RoomHistoryVisibilityEventContent,
-            join_rules::RoomJoinRulesEventContent,
+            join_rules::{RoomJoinRulesEventContent, JoinRule},
         },
         space::child::SpaceChildEventContent, 
     }
@@ -154,14 +154,14 @@ fn process_rooms(rooms: Vec<JoinedRoomState>) -> Vec<PublicRoom> {
 
     let mut public_rooms: Vec<PublicRoom> = Vec::new();
 
-    for room in rooms {
+    for room in &rooms {
 
         let mut pub_room = PublicRoom {
             room_id: room.room_id.to_string(),
             ..Default::default()
         };
 
-        for state_event in room.state.unwrap_or_else(|| Vec::new()) {
+        for state_event in &room.state.clone().unwrap_or_else(|| Vec::new()) {
 
             let event_type = match state_event.get_field::<String>("type") {
                 Ok(Some(t)) => t,
@@ -253,6 +253,8 @@ fn process_rooms(rooms: Vec<JoinedRoomState>) -> Vec<PublicRoom> {
             }
 
             if event_type == "m.space.child" {
+
+
                 if let Ok(Some(content)) = state_event.get_field::<SpaceChildEventContent>("content") {
                     if content.via.len() == 0 {
                         continue;
@@ -260,12 +262,50 @@ fn process_rooms(rooms: Vec<JoinedRoomState>) -> Vec<PublicRoom> {
                 };
 
                 if let Ok(Some(state_key)) = state_event.get_field::<String>("state_key") {
-                    match pub_room.children {
-                        Some(ref mut children) => {
-                            children.push(state_key);
+                    let mut is_public = false;
+
+                    // find the room in the rooms vec
+                    if let Some(child_room) = rooms.iter().find(|r| r.room_id == state_key) {
+
+
+                        for state_event in &child_room.state.clone().unwrap_or_else(|| Vec::new()) {
+
+                            let event_type = match state_event.get_field::<String>("type") {
+                                Ok(Some(t)) => t,
+                                Ok(None) => {
+                                    continue;
+                                }
+                                Err(_) => {
+                                    continue;
+                                }
+                            };
+
+                            if event_type == "m.room.join_rules" {
+                                if let Ok(Some(content)) = state_event.get_field::<RoomJoinRulesEventContent>("content") {
+
+                                    if matches!(content.join_rule, JoinRule::Public) {
+                                        is_public = true;
+                                        break; 
+                                    }
+                                };
+                            }
+
                         }
-                        None => {
-                            pub_room.children = Some(vec![state_key]);
+
+                        
+                    }
+
+
+
+
+                    if is_public {
+                        match pub_room.children {
+                            Some(ref mut children) => {
+                                children.push(state_key);
+                            }
+                            None => {
+                                pub_room.children = Some(vec![state_key]);
+                            }
                         }
                     }
 

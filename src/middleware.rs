@@ -33,6 +33,8 @@ use std::sync::Arc;
 use crate::AppState;
 use crate::utils::room_id_valid;
 
+use crate::error::AppserviceError;
+
 pub async fn authenticate_homeserver(
     State(state): State<Arc<AppState>>,
     req: Request<Body>,
@@ -156,22 +158,18 @@ pub async fn validate_public_room(
     State(state): State<Arc<AppState>>,
     req: Request<Body>,
     next: Next,
-) -> Result<impl IntoResponse, (StatusCode, Json<Value>)> {
+) -> Result<impl IntoResponse, AppserviceError> {
 
-    if let Some(room_id) = data.room_id.as_ref() {
+    let room_id = data
+        .room_id
+        .as_ref()
+        .ok_or(AppserviceError::AppserviceError("No room ID found".to_string()))?;
 
-        if let Ok(id) = RoomId::parse(room_id) {
+    let id = RoomId::parse(room_id)
+        .map_err(|_| AppserviceError::AppserviceError("Invalid room ID".to_string()))?;
 
-            if !state.appservice.has_joined_room(id).await {
-                return Err((
-                    StatusCode::FORBIDDEN,
-                    Json(json!({
-                        "errcode": "NOT_IN_ROOM",
-                        "error": "User is not in room"
-                    }))
-                ));
-            }
-        }
+    if !state.appservice.has_joined_room(id).await {
+        return Err(AppserviceError::AppserviceError("User is not in room".to_string()));
     }
 
     Ok(next.run(req).await)
