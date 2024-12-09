@@ -298,14 +298,12 @@ fn process_rooms(rooms: Vec<JoinedRoomState>) -> Vec<PublicRoom> {
 
 
 
-                    if is_public {
-                        match pub_room.children {
-                            Some(ref mut children) => {
-                                children.push(state_key);
-                            }
-                            None => {
-                                pub_room.children = Some(vec![state_key]);
-                            }
+                    match pub_room.children {
+                        Some(ref mut children) => {
+                            children.push(state_key);
+                        }
+                        None => {
+                            pub_room.children = Some(vec![state_key]);
                         }
                     }
 
