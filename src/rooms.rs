@@ -193,6 +193,9 @@ fn process_rooms(rooms: Vec<JoinedRoomState>) -> Vec<PublicRoom> {
             // don't overwrite the name if commune.room.name is already set
             if event_type == "m.room.name" && pub_room.name.is_none() {
                 if let Ok(Some(content)) = state_event.get_field::<RoomNameEventContent>("content") {
+                    if content.name.contains("[⛓️]") {
+                        continue
+                    } 
                     pub_room.name = Some(content.name.to_string());
                 };
             }

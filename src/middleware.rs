@@ -31,7 +31,7 @@ use serde_json::{
 use std::sync::Arc;
 
 use crate::AppState;
-use crate::utils::is_room_id_ok;
+use crate::utils::room_id_valid;
 
 pub async fn authenticate_homeserver(
     State(state): State<Arc<AppState>>,
@@ -88,7 +88,7 @@ pub async fn validate_room_id(
         room_id: Some(room_id.clone()),
     };
 
-    if let Err(_) = is_room_id_ok(&room_id, &server_name) {
+    if let Err(_) = room_id_valid(&room_id, &server_name) {
 
         let raw_alias = format!("#{}:{}", room_id, server_name);
 

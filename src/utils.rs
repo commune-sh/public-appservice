@@ -6,7 +6,7 @@ use ruma::{
     OwnedRoomId
 };
 
-pub fn is_room_id_ok(room_id: &str, server_name: &str) -> Result<OwnedRoomId, String> {
+pub fn room_id_valid(room_id: &str, server_name: &str) -> Result<OwnedRoomId, String> {
 
     match RoomId::parse(room_id) {
 
