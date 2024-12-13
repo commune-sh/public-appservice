@@ -139,7 +139,12 @@ pub async fn matrix_proxy(
 
     let homeserver = &state.config.matrix.homeserver;
 
-    let uri = format!("{}{}{}", homeserver, path, path_query);
+    // add path query if path wasn't modified in middleware
+    let uri = if data.modified_path.is_some() {
+        format!("{}{}", homeserver, path)
+    } else {
+        format!("{}{}{}", homeserver, path, path_query)
+    };
 
     *req.uri_mut() = Uri::try_from(uri).unwrap();
 
