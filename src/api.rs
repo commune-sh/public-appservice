@@ -74,7 +74,13 @@ pub async fn transactions(
 
         match server_name {
             Some(server_name) => {
-                if server_name.as_str() != state.config.matrix.server_name {
+
+                let allowed = state.config.appservice.rules.federation_domain_whitelist.iter().any(|domain| {
+                    server_name.as_str().ends_with(domain)
+                });
+
+
+                if server_name.as_str() != state.config.matrix.server_name && allowed {
                     // Ignore events for rooms on other servers, if configured to local homeserver
                     // users
                     if state.config.appservice.rules.invite_by_local_user {
