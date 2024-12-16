@@ -11,11 +11,11 @@ hs_access_token = "homeserver-access-token"
 [appservice.rules]
 auto_join = true
 invite_by_local_user = true
-federation_domain_whitelist = ["matrix.org", "localhost:8481"]
+federation_domain_whitelist = ["matrix.org", "dev.commune.sh"]
 
 [matrix]
-homeserver = "http://localhost:8080"
-server_name = "localhost:8480"
+homeserver = "http://localhost:8008"
+server_name = "commune.sh"
 
 [redis]
 url = "127.0.0.1:6379"
