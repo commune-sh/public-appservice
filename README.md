@@ -107,8 +107,10 @@ This appservice uses redis to cache public room data. Ensure that you have a red
 
 #### Running
 
-There are a couple oof ways to run this appservice. You can clone the repo and
-build it with `cargo build --release` and run the binary with `./target/release/public-appservice`.
+There are a couple of ways to run this appservice. You can clone the repo and
+build it with `cargo build --release` and run the binary with `./target/release/public-appservice --config=/path/to/config.toml`.
+
+You can also install it with `cargo install public-appservice` and run it with `public-appservice --config=/path/to/config.toml`.
 
 Additionally, you can run the server in a container with `docker compose up -v`.
 
