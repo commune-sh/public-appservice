@@ -262,7 +262,7 @@ fn process_rooms(rooms: Vec<JoinedRoomState>) -> Vec<PublicRoom> {
                 };
 
                 if let Ok(Some(state_key)) = state_event.get_field::<String>("state_key") {
-                    let mut is_public = false;
+                    let mut _is_public = false;
 
                     // find the room in the rooms vec
                     if let Some(child_room) = rooms.iter().find(|r| r.room_id == state_key) {
@@ -284,7 +284,7 @@ fn process_rooms(rooms: Vec<JoinedRoomState>) -> Vec<PublicRoom> {
                                 if let Ok(Some(content)) = state_event.get_field::<RoomJoinRulesEventContent>("content") {
 
                                     if matches!(content.join_rule, JoinRule::Public) {
-                                        is_public = true;
+                                        //is_public = true;
                                         break; 
                                     }
                                 };
