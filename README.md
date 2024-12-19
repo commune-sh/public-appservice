@@ -9,6 +9,13 @@ This is a work in progress, and has been tested with Synapse, Dendrite and
 Conduit. It's still rough around the edges, but can be used in production. It's
 currently running on the [Commune](https://commune.sh) and [Dev](https://dev.commune.sh) instances.
 
+#### Funding
+
+This project is funded through [NGI0 Entrust](https://nlnet.nl/entrust), a fund established by [NLnet](https://nlnet.nl) with financial support from the European Commission's [Next Generation Internet](https://ngi.eu) program. Learn more at the [NLnet project page](https://nlnet.nl/project/Commune).
+
+[<img src="https://nlnet.nl/logo/banner.png" alt="NLnet foundation logo" width="20%" />](https://nlnet.nl)
+[<img src="https://nlnet.nl/image/logos/NGI0_tag.svg" alt="NGI Zero Logo" width="20%" />](https://nlnet.nl/entrust)
+
 #### Discovery
 
 The Commune client queries the matrix homeserver's `/.well-known/matrix/client` endpoint to detect whether this appservice is running. Ensure that the endpoint returns the `commune.appservice` URL:
