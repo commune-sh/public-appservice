@@ -331,9 +331,9 @@ struct CommuneRoomType {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct RoomInfoOptions {
-    pub child_room: Option<String>,
-    pub event_id: Option<String>,
+pub struct RoomInfoParams {
+    pub room: Option<String>,
+    pub event: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -359,7 +359,7 @@ pub struct Sender {
 pub async fn room_info (
     Path(params): Path<Vec<(String, String)>>,
     Extension(data): Extension<Data>,
-    Query(query): Query<RoomInfoOptions>,
+    Query(query): Query<RoomInfoParams>,
     State(state): State<Arc<AppState>>,
 ) -> Result<impl IntoResponse, AppserviceError> {
 
@@ -383,7 +383,7 @@ pub async fn room_info (
         sender: None,
     };
 
-    if let Some(alias) = query.child_room {
+    if let Some(alias) = query.room {
 
         let hierarchy = state.appservice.get_room_hierarchy(parsed_id.clone()).await;
 
@@ -410,7 +410,7 @@ pub async fn room_info (
 
     }
 
-    if let Some(event_id) = query.event_id {
+    if let Some(event_id) = query.event {
         let parsed_event_id = EventId::parse(&event_id)
             .map_err(|_| AppserviceError::MatrixError("Invalid event ID".to_string()))?;
 
