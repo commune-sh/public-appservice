@@ -33,6 +33,7 @@ use crate::ping::ping;
 use crate::api::{
     transactions,
     matrix_proxy,
+    media_proxy
 };
 
 pub struct Server{
@@ -108,6 +109,7 @@ impl Server {
             .nest("/_matrix/app/v1", service_routes)
             .nest("/_matrix/client/v3/rooms", room_routes)
             .nest("/_matrix/client/v1/rooms/:rood_id", more_room_routes)
+            .route("/_matrix/client/v1/media/thumbnail/*path", get(media_proxy))
             .nest("/publicRooms", public_rooms_route)
             .route("/", get(index))
             .layer(self.setup_cors(&self.state.config))
