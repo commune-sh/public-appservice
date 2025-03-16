@@ -105,11 +105,15 @@ impl Server {
             .route("/", get(public_rooms));
             //.route_layer(middleware::from_fn_with_state(self.state.clone(), public_rooms_cache));
 
+        let media_routes = Router::new()
+            .route("/thumbnail/*path", get(media_proxy))
+            .route("/download/*path", get(media_proxy));
+
         let app = Router::new()
             .nest("/_matrix/app/v1", service_routes)
             .nest("/_matrix/client/v3/rooms", room_routes)
             .nest("/_matrix/client/v1/rooms/:rood_id", more_room_routes)
-            .route("/_matrix/client/v1/media/thumbnail/*path", get(media_proxy))
+            .nest("/_matrix/client/v1/media", media_routes)
             .nest("/publicRooms", public_rooms_route)
             .route("/", get(index))
             .layer(self.setup_cors(&self.state.config))
