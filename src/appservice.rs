@@ -10,7 +10,6 @@ use ruma::{
         appservice::request_ping,
         alias::get_alias,
         account::whoami, 
-        membership::joined_rooms, 
         state::{
             get_state_events, 
             get_state_events_for_key
@@ -18,6 +17,7 @@ use ruma::{
         room::get_room_event,
         membership::{
             join_room_by_id, 
+            joined_rooms,
             leave_room
         },
         profile::get_profile,
@@ -109,16 +109,16 @@ impl AppService {
         Ok(r)
     }
 
-    pub async fn join_room(&self, room_id: OwnedRoomId) {
+    pub async fn join_room(&self, room_id: OwnedRoomId) -> Result<(), anyhow::Error>{
 
         let jr = self.client
             .send_request(join_room_by_id::v3::Request::new(
                 room_id
             ))
-            .await
-            .ok();
+            .await?;
 
-        println!("Join room: {:#?}", jr);
+        tracing::info!("Joined room: {:#?}", jr);
+        Ok(())
     }
 
     pub async fn has_joined_room(&self, room_id: OwnedRoomId) -> Result<bool, anyhow::Error> {
@@ -161,13 +161,12 @@ impl AppService {
         Ok(())
     }
 
-    pub async fn joined_rooms(&self) -> Option<Vec<ruma::OwnedRoomId>> {
+    pub async fn joined_rooms(&self) -> Result<Vec<ruma::OwnedRoomId>, anyhow::Error> {
         let jr = self.client
             .send_request(joined_rooms::v3::Request::new())
-            .await
-            .ok()?;
+            .await?;
 
-        Some(jr.joined_rooms)
+        Ok(jr.joined_rooms)
     }
 
     pub async fn room_id_from_alias(&self, room_alias: ruma::OwnedRoomAliasId) -> Option<ruma::OwnedRoomId> {

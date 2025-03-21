@@ -51,7 +51,7 @@ pub async fn transactions(
 
                         let room_id = event.room_id().to_owned();
                         info!("Joining room: {}", room_id);
-                        state.appservice.join_room(room_id).await;
+                        let _ =state.appservice.join_room(room_id).await;
 
                         return Ok(Json(json!({})))
                     }
@@ -105,7 +105,7 @@ pub async fn transactions(
         match membership {
             MembershipState::Invite => {
                 info!("Joining room: {}", room_id);
-                state.appservice.join_room(room_id).await;
+                let _ = state.appservice.join_room(room_id).await;
             }
             MembershipState::Leave => {
                 info!("Left room: {}", room_id);
