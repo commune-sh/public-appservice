@@ -90,60 +90,62 @@ pub async fn validate_room_id(
         room_id: Some(room_id.clone()),
     };
 
-    if let Err(_) = room_id_valid(&room_id, &server_name) {
+    // This is a valid room_id, so move on
+    if let Ok(_) = room_id_valid(&room_id, &server_name) {
+        req.extensions_mut().insert(data);
+        return Ok(next.run(req).await);
+    }
 
-        let raw_alias = format!("#{}:{}", room_id, server_name);
+    let raw_alias = format!("#{}:{}", room_id, server_name);
 
-        if let Ok(alias) = RoomAliasId::parse(&raw_alias) {
-            let id = state.appservice.room_id_from_alias(alias).await;
-            match id {
-                Some(id) => {
-                    println!("Fetched Room ID: {:#?}", id);
-                    data.room_id = Some(id.to_string());
-                }
-                None => {
-                    println!("Failed to get room ID from alias: {}", raw_alias);
-                }
+    if let Ok(alias) = RoomAliasId::parse(&raw_alias) {
+        let id = state.appservice.room_id_from_alias(alias).await;
+        match id {
+            Some(id) => {
+                println!("Fetched Room ID: {:#?}", id);
+                data.room_id = Some(id.to_string());
+            }
+            None => {
+                println!("Failed to get room ID from alias: {}", raw_alias);
             }
         }
+    }
 
 
-        if let Some(path) = req.extensions().get::<MatchedPath>() {
-            let pattern = path.as_str();
-            
-            // Split into segments, skipping the empty first segment
-            let pattern_segments: Vec<&str> = pattern.split('/').filter(|s| !s.is_empty()).collect();
+    if let Some(path) = req.extensions().get::<MatchedPath>() {
+        let pattern = path.as_str();
+        
+        // Split into segments, skipping the empty first segment
+        let pattern_segments: Vec<&str> = pattern.split('/').filter(|s| !s.is_empty()).collect();
 
-            let fullpath = if let Some(path) = req.extensions().get::<OriginalUri>() {
-                path.0.path()
-            } else {
-                req.uri().path()
-            };
+        let fullpath = if let Some(path) = req.extensions().get::<OriginalUri>() {
+            path.0.path()
+        } else {
+            req.uri().path()
+        };
 
-            let path_segments: Vec<&str> = fullpath.split('/').filter(|s| !s.is_empty()).collect();
-            
-            if let Some(segment_index) = pattern_segments.iter().position(|&s| s == ":room_id") {
-                println!("Found :room_id at segment index: {}", segment_index);
-                let mut new_segments = path_segments.clone();
-                if segment_index < new_segments.len() {
+        let path_segments: Vec<&str> = fullpath.split('/').filter(|s| !s.is_empty()).collect();
+        
+        if let Some(segment_index) = pattern_segments.iter().position(|&s| s == ":room_id") {
+            println!("Found :room_id at segment index: {}", segment_index);
+            let mut new_segments = path_segments.clone();
+            if segment_index < new_segments.len() {
 
-                    new_segments[segment_index] = data.room_id.as_ref().unwrap();
-                    
-                    // Rebuild the path with leading slash
-                    let new_path = format!("/{}", new_segments.join("/"));
-                    
-                    // Preserve query string if it exists
-                    let new_uri = if let Some(query) = req.uri().query() {
-                        format!("{}?{}", new_path, query).parse::<Uri>().unwrap()
-                    } else {
-                        new_path.parse::<Uri>().unwrap()
-                    };
-                    
-                    data.modified_path = Some(new_uri.to_string());
-                }
+                new_segments[segment_index] = data.room_id.as_ref().unwrap();
+                
+                // Rebuild the path with leading slash
+                let new_path = format!("/{}", new_segments.join("/"));
+                
+                // Preserve query string if it exists
+                let new_uri = if let Some(query) = req.uri().query() {
+                    format!("{}?{}", new_path, query).parse::<Uri>().unwrap()
+                } else {
+                    new_path.parse::<Uri>().unwrap()
+                };
+                
+                data.modified_path = Some(new_uri.to_string());
             }
         }
-
     }
 
     req.extensions_mut().insert(data);

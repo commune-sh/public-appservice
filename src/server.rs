@@ -146,5 +146,5 @@ impl Server {
 }
 
 async fn index() -> &'static str {
-    "Matrix public appservice.\n"
+    "Commune public appservice.\n"
 }
