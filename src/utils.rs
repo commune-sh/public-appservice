@@ -6,34 +6,18 @@ use ruma::{
     OwnedRoomId
 };
 
-pub fn room_id_valid(room_id: &str, server_name: &str) -> Result<OwnedRoomId, String> {
+pub fn room_id_valid(room_id: &str, server_name: &str) -> Result<OwnedRoomId, anyhow::Error> {
 
-    match RoomId::parse(room_id) {
+    let parsed_id = RoomId::parse(room_id)?;
 
-        Ok(id) => {
-
-            if !room_id.starts_with('!') {
-                return Err("Room ID must start with '!'".to_string());
-            }
-
-            let pos = room_id.find(':')
-                .ok_or_else(|| "Room ID must contain a ':'".to_string())?;
-
-            let domain = &room_id[pos + 1..];
-
-            if domain.is_empty() {
-                return Err("Room ID must have a valid domain part".to_string());
-            }
-
-            if domain != server_name {
-                return Err(format!("Room ID domain part does not match server_name: {} != {}", domain, server_name));
-            }
-
-            Ok(id)
+    if let Some(domain) = parsed_id.server_name() {
+        if domain != server_name {
+            return Err(anyhow::anyhow!("Room ID does not match server name"));
         }
-
-        Err(err) => Err(format!("Failed to parse Room ID: {}", err)),
     }
+
+    Ok(parsed_id)
+
 }
 
 static SLUG_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"[^a-zA-Z0-9]+").unwrap());

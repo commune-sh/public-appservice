@@ -121,7 +121,7 @@ impl AppService {
         println!("Join room: {:#?}", jr);
     }
 
-    pub async fn has_joined_room(&self, room_id: OwnedRoomId) -> bool {
+    pub async fn has_joined_room(&self, room_id: OwnedRoomId) -> Result<bool, anyhow::Error> {
 
         let jr = self.client
             .send_request(get_state_events_for_key::v3::Request::new(
@@ -129,34 +129,36 @@ impl AppService {
                 StateEventType::RoomMember,
                 self.user_id()
             ))
-            .await 
-            .ok();
+            .await?;
 
-        jr.is_some()
+        let membership = jr.content.get_field::<String>("membership")?;
+
+        Ok(membership == Some("join".to_string()))
     }
 
     pub async fn get_room_state(&self, room_id: OwnedRoomId) ->
-    Option<RoomState> {
+    Result<RoomState, anyhow::Error> {
 
         let state = self.client
             .send_request(get_state_events::v3::Request::new(
                 room_id,
             ))
-            .await
-            .ok()?;
+            .await?;
 
-        Some(state.room_state)
+        Ok(state.room_state)
     }
 
-    pub async fn leave_room(&self, room_id: OwnedRoomId) {
+    pub async fn leave_room(&self, room_id: OwnedRoomId) -> Result<(), anyhow::Error>{
 
         let jr = self.client
             .send_request(leave_room::v3::Request::new(
                 room_id
             ))
-            .await
-            .ok();
-        println!("Left room: {:#?}", jr);
+            .await?;
+
+        tracing::info!("Left room: {:#?}", jr);
+
+        Ok(())
     }
 
     pub async fn joined_rooms(&self) -> Option<Vec<ruma::OwnedRoomId>> {
@@ -186,8 +188,7 @@ impl AppService {
 
         let jr = self.client
             .send_request(joined_rooms::v3::Request::new())
-            .await
-            .map_err(|e| anyhow::anyhow!("Error getting joined rooms: {}", e))?;
+            .await?;
 
         if jr.joined_rooms.len() == 0 {
             return Ok(joined_rooms);
@@ -216,35 +217,33 @@ impl AppService {
         Ok(joined_rooms)
     }
 
-    pub async fn get_room_event(&self, room_id: OwnedRoomId, event_id: OwnedEventId) -> Option<ruma::serde::Raw<AnyTimelineEvent>> {
+    pub async fn get_room_event(&self, room_id: OwnedRoomId, event_id: OwnedEventId) -> Result<ruma::serde::Raw<AnyTimelineEvent>, anyhow::Error> {
 
         let event = self.client
             .send_request(get_room_event::v3::Request::new(
                 room_id,
                 event_id,
             ))
-            .await
-            .ok()?;
+            .await?;
 
-        Some(event.event)
+        Ok(event.event)
     }
 
-    pub async fn get_profile(&self, user_id: String) -> Option<ruma::api::client::profile::get_profile::v3::Response> {
+    pub async fn get_profile(&self, user_id: String) -> Result<get_profile::v3::Response, anyhow::Error> {
 
-        let parsed_id = ruma::OwnedUserId::try_from(user_id.clone()).ok()?;
+        let parsed_id = ruma::OwnedUserId::try_from(user_id.clone())?;
 
         let profile = self.client
             .send_request(get_profile::v3::Request::new(
                 parsed_id,
             ))
-            .await
-            .ok()?;
+            .await?;
 
-        Some(profile)
+        Ok(profile)
     }
 
     pub async fn get_room_summary(&self, room_id: OwnedRoomId) ->
-    Option<RoomSummary> {
+    Result<RoomSummary, anyhow::Error> {
 
         let mut room_info = RoomSummary {
             room_id: room_id.to_string(),
@@ -255,8 +254,7 @@ impl AppService {
             .send_request(get_state_events::v3::Request::new(
                 room_id,
             ))
-            .await
-            .ok()?;
+            .await?;
 
         for state_event in state.room_state {
 
@@ -301,19 +299,18 @@ impl AppService {
             }
         }
 
-        Some(room_info)
+        Ok(room_info)
     }
 
-    pub async fn get_room_hierarchy(&self, room_id: OwnedRoomId) -> Option<Vec<SpaceHierarchyRoomsChunk>> {
+    pub async fn get_room_hierarchy(&self, room_id: OwnedRoomId) -> Result<Vec<SpaceHierarchyRoomsChunk>, anyhow::Error> {
 
         let hierarchy = self.client
             .send_request(get_hierarchy::v1::Request::new(
                 room_id
             ))
-            .await
-            .ok()?;
+            .await?;
 
-        Some(hierarchy.rooms)
+        Ok(hierarchy.rooms)
     }
 
 }

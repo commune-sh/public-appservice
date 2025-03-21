@@ -168,7 +168,11 @@ pub async fn validate_public_room(
     let id = RoomId::parse(room_id)
         .map_err(|_| AppserviceError::AppserviceError("Invalid room ID".to_string()))?;
 
-    if !state.appservice.has_joined_room(id).await {
+    let joined = state.appservice.has_joined_room(id)
+        .await
+        .map_err(|_| AppserviceError::AppserviceError("Failed to check room membership".to_string()))?;
+
+    if !joined {
         return Err(AppserviceError::AppserviceError("User is not in room".to_string()));
     }
 

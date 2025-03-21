@@ -60,18 +60,17 @@ pub async fn public_rooms (
     // read from cache if enabled
     if state.config.cache.public_rooms.enabled {
         let mut redis_conn = state.cache.get_multiplexed_async_connection()
-            .await;
+            .await
+            .map_err(|_| AppserviceError::MatrixError("Failed to fetch rooms".to_string()))?;
 
-        if let Ok(ref mut redis_conn) = redis_conn {
-            if let Ok(cached_data) = get_cached_rooms(redis_conn).await {
-                info!("Public rooms fetched from cache");
-                return Ok((
-                    StatusCode::OK,
-                    Json(json!({
-                        "rooms": json!(cached_data),
-                    }))
-                ))
-            }
+        if let Ok(cached_data) = get_cached_rooms(&mut redis_conn).await {
+            info!("Public rooms fetched from cache");
+            return Ok((
+                StatusCode::OK,
+                Json(json!({
+                    "rooms": json!(cached_data),
+                }))
+            ))
         }
     }
 
@@ -375,7 +374,9 @@ pub async fn room_info (
         .map_err(|_| AppserviceError::MatrixError("Invalid room ID".to_string()))?;
 
     let summary =  state.appservice.get_room_summary(parsed_id.clone())
-        .await.ok_or(AppserviceError::MatrixError("Room not found".to_string()))?;
+        .await
+        .map_err(|_| AppserviceError::MatrixError("Room not found".to_string()))?;
+
     let mut info = RoomInfo {
         info: summary,
         room: None,
@@ -385,28 +386,30 @@ pub async fn room_info (
 
     if let Some(alias) = query.room {
 
-        let hierarchy = state.appservice.get_room_hierarchy(parsed_id.clone()).await;
+        let hierarchy = state.appservice.get_room_hierarchy(parsed_id.clone())
+            .await
+            .map_err(|_| AppserviceError::MatrixError("Failed to fetch room hierarchy".to_string()))?;
 
-        if let Some(hierarchy) = hierarchy {
-            for room in hierarchy {
+        for room in hierarchy {
 
-                if let Some(name) = room.name.as_ref() {
-                    let slug = utils::slugify(name);
+            if let Some(name) = room.name.as_ref() {
+                let slug = utils::slugify(name);
 
-                    if slug == alias {
-                        parsed_id = room.room_id.clone();
+                if slug == alias {
+                    parsed_id = room.room_id.clone();
 
-                        let summary =  state.appservice.get_room_summary(parsed_id.clone())
-                            .await.ok_or(AppserviceError::MatrixError("Room not found".to_string()))?;
+                    let summary = state.appservice.get_room_summary(parsed_id.clone())
+                        .await
+                        .map_err(|_| AppserviceError::MatrixError("Room not found".to_string()))?;
 
-                        info.room = Some(summary);
-                        break;
-                    }
-
+                    info.room = Some(summary);
+                    break;
                 }
 
             }
+
         }
+
 
     }
 
@@ -414,26 +417,26 @@ pub async fn room_info (
         let parsed_event_id = EventId::parse(&event_id)
             .map_err(|_| AppserviceError::MatrixError("Invalid event ID".to_string()))?;
 
-        if let Some(event) = state.appservice.get_room_event(parsed_id, parsed_event_id).await {
+
+        let event = state.appservice.get_room_event(parsed_id, parsed_event_id)
+            .await
+            .map_err(|_| AppserviceError::MatrixError("Event not found".to_string()))?;
 
             info.event = Some(event.clone());
 
             if let Ok(Some(sender)) = event.get_field::<String>("sender") {
                 println!("sender: {:#?}", sender);
 
-                let profile = state.appservice.get_profile(sender).await;
+                let profile = state.appservice.get_profile(sender)
+                    .await
+                    .map_err(|_| AppserviceError::MatrixError("Failed to fetch profile".to_string()))?;
 
-                if let Some(profile) = profile {
-                    info.sender = Some(Sender {
-                        avatar_url: profile.avatar_url,
-                        displayname: profile.displayname,
-                    });
-                }
+                info.sender = Some(Sender {
+                    avatar_url: profile.avatar_url,
+                    displayname: profile.displayname,
+                });
 
             }
-
-        }
-
     }
 
 
