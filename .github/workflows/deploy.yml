@@ -37,5 +37,5 @@ jobs:
 
     - name: Upload binary 
       run: |
-        scp target/release/public-appservice ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/home/${{ secrets.VPS_USER }}/public-appservice/public-appservice
-        scp target/release/public-appservice ${{ secrets.VPS_USER_DEV }}@${{ secrets.VPS_HOST_DEV }}:/home/${{ secrets.VPS_USER_DEV }}/public-appservice/public-appservice
+        rsync -avz --progress target/release/public-appservice ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/home/${{ secrets.VPS_USER }}/public-appservice/
+        rsync -avz --progress target/release/public-appservice ${{ secrets.VPS_USER_DEV }}@${{ secrets.VPS_HOST_DEV }}:/home/${{ secrets.VPS_USER_DEV }}/public-appservice/
