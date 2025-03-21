@@ -4,7 +4,9 @@ use axum::{
     http::HeaderValue,
     extract::Request,
     Router,
-    ServiceExt
+    ServiceExt,
+    response::IntoResponse,
+    Json,
 };
 
 use std::sync::Arc;
@@ -14,6 +16,8 @@ use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 use tower_http::normalize_path::NormalizePathLayer;
 use tower::Layer;
+
+use serde_json::json;
 
 
 use http::header::CONTENT_TYPE;
@@ -115,6 +119,7 @@ impl Server {
             .nest("/_matrix/client/v1/rooms/:rood_id", more_room_routes)
             .nest("/_matrix/client/v1/media", media_routes)
             .nest("/publicRooms", public_rooms_route)
+            .route("/version", get(version))
             .route("/", get(index))
             .layer(self.setup_cors(&self.state.config))
             .layer(TraceLayer::new_for_http())
@@ -148,3 +153,17 @@ impl Server {
 async fn index() -> &'static str {
     "Commune public appservice.\n"
 }
+
+pub async fn version(
+) -> Result<impl IntoResponse, ()> {
+
+    let version = env!("CARGO_PKG_VERSION");
+    let hash = env!("GIT_COMMIT_HASH");
+
+    Ok(Json(json!({
+        "version": version,
+        "commit": hash,
+    })))
+}
+
+
