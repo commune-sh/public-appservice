@@ -180,3 +180,32 @@ pub async fn validate_public_room(
 
     Ok(next.run(req).await)
 }
+
+pub async fn is_public_room(
+    Extension(data): Extension<Data>,
+    State(state): State<Arc<AppState>>,
+) -> Result<impl IntoResponse, AppserviceError> {
+
+    let room_id = data
+        .room_id
+        .as_ref()
+        .ok_or(AppserviceError::AppserviceError("No room ID found".to_string()))?;
+
+    let id = RoomId::parse(room_id)
+        .map_err(|_| AppserviceError::AppserviceError("Invalid room ID".to_string()))?;
+
+    let joined = state.appservice.has_joined_room(id)
+        .await
+        .map_err(|_| AppserviceError::AppserviceError("Failed to check room membership".to_string()))?;
+
+    if !joined {
+        return Err(AppserviceError::AppserviceError("User is not in room".to_string()));
+    }
+
+    Ok((
+        StatusCode::OK,
+        Json(json!({
+            "public": true,
+        }))
+    ))
+}

@@ -28,6 +28,7 @@ use crate::config::Config;
 use crate::rooms::{public_rooms, room_info};
 use crate::middleware::{
     authenticate_homeserver,
+    is_public_room,
     validate_public_room,
     validate_room_id,
 };
@@ -98,6 +99,11 @@ impl Server {
             .route_layer(middleware::from_fn_with_state(self.state.clone(), validate_public_room))
             .route_layer(middleware::from_fn_with_state(self.state.clone(), validate_room_id));
 
+        let public_room = Router::new()
+            .route("/:room_id", get(is_public_room))
+            .route_layer(middleware::from_fn_with_state(self.state.clone(), validate_room_id));
+
+
         let more_room_routes = Router::new()
             .route("/hierarchy", get(matrix_proxy))
             .route("/threads", get(matrix_proxy))
@@ -116,7 +122,8 @@ impl Server {
         let app = Router::new()
             .nest("/_matrix/app/v1", service_routes)
             .nest("/_matrix/client/v3/rooms", room_routes)
-            .nest("/_matrix/client/v1/rooms/:rood_id", more_room_routes)
+            .nest("/_matrix/client/v3/public", public_room)
+            .nest("/_matrix/client/v1/rooms/:room_id", more_room_routes)
             .nest("/_matrix/client/v1/media", media_routes)
             .nest("/publicRooms", public_rooms_route)
             .route("/version", get(version))
