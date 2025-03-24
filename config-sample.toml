@@ -22,3 +22,15 @@ url = "127.0.0.1:6379"
 pool_size = 20
 timeout_secs = 5
 cache_ttl = 300
+
+[cache.public_rooms]
+enabled = true
+expire_after = 3600
+
+[cache.room_state]
+enabled = true
+expire_after = 3600
+
+[cache.messages]
+enabled = true
+expire_after = 3600
