@@ -198,14 +198,19 @@ pub async fn is_public_room(
         .await
         .map_err(|_| AppserviceError::AppserviceError("Failed to check room membership".to_string()))?;
 
-    if !joined {
-        return Err(AppserviceError::AppserviceError("User is not in room".to_string()));
+    if joined {
+        return Ok((
+            StatusCode::OK,
+            Json(json!({
+                "public": true,
+            }))
+        ))
     }
 
     Ok((
         StatusCode::OK,
         Json(json!({
-            "public": true,
+            "public": false,
         }))
     ))
 }
