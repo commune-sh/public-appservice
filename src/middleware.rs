@@ -131,16 +131,16 @@ pub async fn validate_room_id(
             let mut new_segments = path_segments.clone();
             if segment_index < new_segments.len() {
 
-                new_segments[segment_index] = data.room_id.as_ref().unwrap();
+                new_segments[segment_index] = data.room_id.as_ref().unwrap_or(&room_id);
                 
                 // Rebuild the path with leading slash
                 let new_path = format!("/{}", new_segments.join("/"));
                 
                 // Preserve query string if it exists
                 let new_uri = if let Some(query) = req.uri().query() {
-                    format!("{}?{}", new_path, query).parse::<Uri>().unwrap()
+                    format!("{}?{}", new_path, query).parse::<Uri>().unwrap_or_default()
                 } else {
-                    new_path.parse::<Uri>().unwrap()
+                    new_path.parse::<Uri>().unwrap_or_default()
                 };
                 
                 data.modified_path = Some(new_uri.to_string());

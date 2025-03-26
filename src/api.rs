@@ -152,7 +152,8 @@ pub async fn matrix_proxy(
         format!("{}{}{}", homeserver, path, path_query)
     };
 
-    *req.uri_mut() = Uri::try_from(uri).unwrap();
+    *req.uri_mut() = Uri::try_from(uri)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     let access_token = &state.config.appservice.access_token;
 
@@ -188,7 +189,8 @@ pub async fn media_proxy(
     // add path query if path wasn't modified in middleware
     let uri = format!("{}{}{}", homeserver, path, path_query);
 
-    *req.uri_mut() = Uri::try_from(uri).unwrap();
+    *req.uri_mut() = Uri::try_from(uri)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     let access_token = &state.config.appservice.access_token;
 
