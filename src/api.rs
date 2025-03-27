@@ -19,12 +19,21 @@ use ruma::events::room::{
     history_visibility::{RoomHistoryVisibilityEvent, HistoryVisibility},
 };
 
+use ruma::events::macros::EventContent;
+
 use serde_json::{Value, json};
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tracing::info;
 
 use crate::AppState;
 use crate::middleware::Data;
+
+#[derive(Clone, Debug, Deserialize, Serialize, EventContent)]
+#[ruma_event(type = "commune.public.room", kind = State, state_key_type = String)]
+pub struct CommunePublicRoomEventContent {
+    pub public: bool,
+}
 
 pub async fn transactions(
     State(state): State<Arc<AppState>>,
@@ -40,7 +49,9 @@ pub async fn transactions(
     };
 
     for event in events {
-        println!("Event: {:#?}", event);
+        if cfg!(debug_assertions) {
+            println!("Event: {:#?}", event);
+        }
 
         // If auto-join is enabled, join rooms with world_readable history visibility
         if state.config.appservice.rules.auto_join {
@@ -59,6 +70,51 @@ pub async fn transactions(
                 }
             }
         };
+
+        // Match commune.room.public types
+
+        /*
+        let room_id = event["room_id"].as_str();
+        let event_type = event["type"].as_str();
+        let public = event["content"]["public"].as_bool();
+
+        match room_id {
+            Some(room_id) => {
+                println!("Room ID: {}", room_id);
+                let room_id = RoomId::parse(room_id);
+                 match (event_type, public) {
+                    (Some("commune.room.public"), Some(true)) => {
+                        info!("Joining room: {}", room_id);
+                        let _ = state.appservice.join_room(room_id).await;
+                    },
+                    (Some("commune.room.public"), Some(false)) => {
+                        println!("Leave room");
+
+                    }
+                    _ => {}
+                }
+            }
+            None => {}
+        }
+        */
+
+        let public = event["content"]["public"].as_bool();
+        if let Ok(event) = serde_json::from_value::<CommunePublicRoomEvent>(event.clone()) {
+            tracing::info!("Commune Public room event.");
+            let room_id = event.room_id().to_owned();
+            match public {
+                Some(true) => {
+                    info!("Joining room: {}", room_id);
+                    let _ = state.appservice.join_room(room_id).await;
+                }
+                Some(false) => {
+                    info!("Leaving room: {}", room_id);
+                    let _ = state.appservice.leave_room(room_id).await;
+                }
+                None => {}
+            }
+        };
+
 
         let member_event = if let Ok(event) = serde_json::from_value::<RoomMemberEvent>(event.clone()) {
             event
