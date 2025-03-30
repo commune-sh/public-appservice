@@ -192,17 +192,14 @@ impl AppService {
             // Get subset of joined rooms from config
             let mut joined_rooms: Vec<JoinedRoomState> = Vec::new();
 
+            // first get top level spaces
             for local_part in include_rooms {
 
                 let alias = format!("#{}:{}", local_part, self.config.matrix.server_name);
 
-                println!("Curated room is {:#?}", alias);
-
                 let alias = RoomAliasId::parse(&alias)?;
 
                 let room_id = self.room_id_from_alias(alias).await?;
-
-                println!("Room ID is {:#?}", room_id);
 
                 let mut jrs = JoinedRoomState {
                     room_id: room_id.clone(),
@@ -211,7 +208,7 @@ impl AppService {
 
                 let st = self.client
                     .send_request(get_state_events::v3::Request::new(
-                        room_id,
+                        room_id.clone(),
                     ))
                     .await?;
 
@@ -219,6 +216,32 @@ impl AppService {
 
                 joined_rooms.push(jrs);
 
+
+                // find child rooms and add to list
+                let hierarchy = self.client
+                    .send_request(get_hierarchy::v1::Request::new(
+                        room_id
+                    ))
+                    .await?;
+
+                for room in hierarchy.rooms {
+                    let mut jrs = JoinedRoomState {
+                        room_id: room.room_id.clone(),
+                        state: None,
+                    };
+                    let st = self.client
+                        .send_request(get_state_events::v3::Request::new(
+                            room.room_id.clone(),
+                        ))
+                        .await?;
+
+                    jrs.state = Some(st.room_state);
+
+                    let exists = joined_rooms.iter().any(|r| r.room_id == room.room_id);
+                    if !exists {
+                        joined_rooms.push(jrs);
+                    }
+                }
             }
 
             return Ok(Some(joined_rooms));

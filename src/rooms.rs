@@ -156,7 +156,7 @@ fn is_false(b: &bool) -> bool {
 }
 
 fn process_rooms(
-    state: Arc<AppState>,
+    _state: Arc<AppState>,
     rooms: Vec<JoinedRoomState>
 ) -> Vec<PublicRoom> {
 
