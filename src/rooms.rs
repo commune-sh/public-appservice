@@ -74,12 +74,18 @@ pub async fn public_rooms (
         }
     }
 
-    let rooms = state.appservice.joined_rooms_state()
-        .await 
-        .map_err(|_| AppserviceError::MatrixError("Failed to fetch rooms".to_string()))?;
+    let rooms = match state.appservice.joined_rooms_state()
+        .await {
+            Ok(Some(rooms)) => rooms,
+            Ok(None) | Err(_) => {
+                return Err(AppserviceError::MatrixError("Failed to fetch rooms".to_string()));
+            }
+        };
 
 
-    let processed = process_rooms(rooms);
+    let state_copy = state.clone();
+
+    let processed = process_rooms(state_copy, rooms);
 
     let to_cache = processed.clone();
 
@@ -149,7 +155,10 @@ fn is_false(b: &bool) -> bool {
     !*b
 }
 
-fn process_rooms(rooms: Vec<JoinedRoomState>) -> Vec<PublicRoom> {
+fn process_rooms(
+    state: Arc<AppState>,
+    rooms: Vec<JoinedRoomState>
+) -> Vec<PublicRoom> {
 
     let mut public_rooms: Vec<PublicRoom> = Vec::new();
 
@@ -318,6 +327,8 @@ fn process_rooms(rooms: Vec<JoinedRoomState>) -> Vec<PublicRoom> {
                 continue
             } 
         } 
+
+
         public_rooms.push(pub_room);
     }
 

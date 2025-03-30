@@ -10,6 +10,7 @@ pub struct Config {
     pub matrix: Matrix,
     pub redis: Redis,
     pub cache: Cache,
+    pub public_rooms: PublicRooms,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -81,6 +82,12 @@ pub struct CacheOptions {
     pub enabled: bool,
     #[serde(default = "default_cache_ttl")]
     pub expire_after: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PublicRooms {
+    pub curated: bool,
+    pub include_rooms: Vec<String>,
 }
 
 

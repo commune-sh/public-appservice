@@ -101,11 +101,11 @@ pub async fn validate_room_id(
     if let Ok(alias) = RoomAliasId::parse(&raw_alias) {
         let id = state.appservice.room_id_from_alias(alias).await;
         match id {
-            Some(id) => {
+            Ok(id) => {
                 println!("Fetched Room ID: {:#?}", id);
                 data.room_id = Some(id.to_string());
             }
-            None => {
+            Err(_) => {
                 println!("Failed to get room ID from alias: {}", raw_alias);
             }
         }

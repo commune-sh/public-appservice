@@ -6,6 +6,7 @@ use ruma::{
     OwnedUserId,
     OwnedTransactionId,
     UserId,
+    RoomAliasId,
     api::client::{
         appservice::request_ping,
         alias::get_alias,
@@ -45,6 +46,7 @@ pub type HttpClient = ruma::client::http_client::HyperNativeTls;
 #[derive(Clone)]
 pub struct AppService {
     client: ruma::Client<HttpClient>,
+    config: Config,
     pub appservice_id: String,
     pub user_id: Box<OwnedUserId>,
 }
@@ -79,6 +81,7 @@ impl AppService {
 
         Ok(Self { 
             client, 
+            config: config.clone(),
             appservice_id: config.appservice.id.clone(),
             user_id: Box::new(user_id)
         })
@@ -169,19 +172,58 @@ impl AppService {
         Ok(jr.joined_rooms)
     }
 
-    pub async fn room_id_from_alias(&self, room_alias: ruma::OwnedRoomAliasId) -> Option<ruma::OwnedRoomId> {
+    pub async fn room_id_from_alias(&self, room_alias: ruma::OwnedRoomAliasId) -> Result<ruma::OwnedRoomId, anyhow::Error> {
 
         let room_id = self.client
             .send_request(get_alias::v3::Request::new(
                 room_alias,
             ))
-            .await
-            .ok()?;
+            .await?;
 
-        Some(room_id.room_id)
+        Ok(room_id.room_id)
     }
 
-    pub async fn joined_rooms_state(&self) -> Result<Vec<JoinedRoomState>, anyhow::Error> {
+    pub async fn joined_rooms_state(&self) -> Result<Option<Vec<JoinedRoomState>>, anyhow::Error> {
+
+        let curated = self.config.public_rooms.curated;
+        let include_rooms = &self.config.public_rooms.include_rooms;
+
+        if curated && include_rooms.len() > 0 {
+            // Get subset of joined rooms from config
+            let mut joined_rooms: Vec<JoinedRoomState> = Vec::new();
+
+            for local_part in include_rooms {
+
+                let alias = format!("#{}:{}", local_part, self.config.matrix.server_name);
+
+                println!("Curated room is {:#?}", alias);
+
+                let alias = RoomAliasId::parse(&alias)?;
+
+                let room_id = self.room_id_from_alias(alias).await?;
+
+                println!("Room ID is {:#?}", room_id);
+
+                let mut jrs = JoinedRoomState {
+                    room_id: room_id.clone(),
+                    state: None,
+                };
+
+                let st = self.client
+                    .send_request(get_state_events::v3::Request::new(
+                        room_id,
+                    ))
+                    .await?;
+
+                jrs.state = Some(st.room_state);
+
+                joined_rooms.push(jrs);
+
+            }
+
+            return Ok(Some(joined_rooms));
+        }
+
 
         let mut joined_rooms: Vec<JoinedRoomState> = Vec::new();
 
@@ -190,7 +232,7 @@ impl AppService {
             .await?;
 
         if jr.joined_rooms.len() == 0 {
-            return Ok(joined_rooms);
+            return Ok(None);
         }
 
         for room_id in jr.joined_rooms {
@@ -213,7 +255,7 @@ impl AppService {
 
         }
 
-        Ok(joined_rooms)
+        Ok(Some(joined_rooms))
     }
 
     pub async fn get_room_event(&self, room_id: OwnedRoomId, event_id: OwnedEventId) -> Result<ruma::serde::Raw<AnyTimelineEvent>, anyhow::Error> {
