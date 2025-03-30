@@ -253,11 +253,12 @@ fn process_rooms(rooms: Vec<JoinedRoomState>) -> Vec<PublicRoom> {
 
             if event_type == "m.space.child" {
 
-
                 if let Ok(Some(content)) = state_event.get_field::<SpaceChildEventContent>("content") {
                     if content.via.len() == 0 {
                         continue;
                     }
+                } else {
+                    continue;
                 };
 
                 if let Ok(Some(state_key)) = state_event.get_field::<String>("state_key") {
