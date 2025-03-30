@@ -445,3 +445,44 @@ pub async fn room_info (
         Json(json!(info))
     ))
 }
+
+pub async fn join_room (
+    State(state): State<Arc<AppState>>,
+    Path(room_id): Path<String>,
+) -> Result<impl IntoResponse, AppserviceError> {
+
+    println!("Requested to join room: {}", room_id);
+
+    let room_id = RoomId::parse(&room_id)
+        .map_err(|_| AppserviceError::MatrixError("Invalid room ID".to_string()))?;
+
+    let _ = state.appservice.join_room(room_id).await;
+
+    Ok((
+        StatusCode::OK,
+        Json(json!({
+            "joined": true
+        }))
+    ))
+}
+
+pub async fn leave_room (
+    State(state): State<Arc<AppState>>,
+    Path(room_id): Path<String>,
+) -> Result<impl IntoResponse, AppserviceError> {
+
+    println!("Requested to leave room: {}", room_id);
+
+    let room_id = RoomId::parse(&room_id)
+        .map_err(|_| AppserviceError::MatrixError("Invalid room ID".to_string()))?;
+
+    let _ = state.appservice.leave_room(room_id).await;
+
+    Ok((
+        StatusCode::OK,
+        Json(json!({
+            "left": true
+        }))
+    ))
+}
+
