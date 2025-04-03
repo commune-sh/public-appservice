@@ -2,7 +2,7 @@ use axum::{
     middleware::{self},
     routing::{get, put, post},
     http::HeaderValue,
-    extract::Request,
+    extract::{Request, State},
     Router,
     ServiceExt,
     response::IntoResponse,
@@ -134,6 +134,7 @@ impl Server {
             .nest("/publicRooms", public_rooms_route)
             .nest("/admin", admin_routes)
             .route("/version", get(version))
+            .route("/identity", get(identity))
             .route("/", get(index))
             .layer(self.setup_cors(&self.state.config))
             .layer(TraceLayer::new_for_http())
@@ -181,3 +182,17 @@ pub async fn version(
 }
 
 
+pub async fn identity(
+    State(state): State<Arc<AppState>>,
+) -> Result<impl IntoResponse, ()> {
+
+    let user = format!(
+        "@{}:{}", 
+        state.config.appservice.sender_localpart, 
+        state.config.matrix.server_name
+    );
+
+    Ok(Json(json!({
+        "user": user,
+    })))
+}
