@@ -8,6 +8,7 @@ pub mod middleware;
 pub mod cache;
 pub mod error;
 pub mod utils;
+pub mod oidc;
 
 use std::sync::Arc;
 use axum::body::Body;
@@ -22,6 +23,7 @@ pub struct AppState {
     pub appservice: appservice::AppService,
     pub transaction_store: ping::TransactionStore,
     pub cache: redis::Client,
+    pub oidc: oidc::AuthMetadata,
 }
 
 impl AppState {
@@ -36,12 +38,17 @@ impl AppState {
 
         let transaction_store = ping::TransactionStore::new();
 
+        let oidc = oidc::get_auth_metadata(&config.matrix.homeserver).await?;
+
+        println!("OIDC Metadata: {:?}", oidc);
+
         Ok(Arc::new(Self {
             config,
             proxy: client,
             appservice,
             transaction_store,
             cache: cache.client,
+            oidc,
         }))
     }
 }
