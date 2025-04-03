@@ -27,6 +27,7 @@ use anyhow;
 use crate::config::Config;
 use crate::rooms::{public_rooms, room_info, join_room, leave_room};
 use crate::middleware::{
+    is_admin,
     authenticate_homeserver,
     is_public_room,
     validate_public_room,
@@ -119,6 +120,11 @@ impl Server {
             .route("/thumbnail/*path", get(media_proxy))
             .route("/download/*path", get(media_proxy));
 
+        let admin_routes = Router::new()
+            .route("/room/:room_id/join", put(join_room))
+            .route("/room/:room_id/leave", put(leave_room))
+            .route_layer(middleware::from_fn_with_state(self.state.clone(), is_admin));
+
         let app = Router::new()
             .nest("/_matrix/app/v1", service_routes)
             .nest("/_matrix/client/v3/rooms", room_routes)
@@ -126,8 +132,7 @@ impl Server {
             .nest("/_matrix/client/v1/rooms/:room_id", more_room_routes)
             .nest("/_matrix/client/v1/media", media_routes)
             .nest("/publicRooms", public_rooms_route)
-            .route("/join_room/:room_id", put(join_room))
-            .route("/leave_room/:room_id", put(leave_room))
+            .nest("/admin", admin_routes)
             .route("/version", get(version))
             .route("/", get(index))
             .layer(self.setup_cors(&self.state.config))

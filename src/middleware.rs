@@ -35,38 +35,63 @@ use crate::utils::room_id_valid;
 
 use crate::error::AppserviceError;
 
+pub fn extract_token(header: &str) -> Option<&str> {
+    header.strip_prefix("Bearer ").map(|token| token.trim())
+}
+
+fn unauthorized_error() -> (StatusCode, Json<Value>) {
+    (
+        StatusCode::UNAUTHORIZED,
+        Json(json!({
+            "errcode": "M_FORBIDDEN",
+        }))
+    )
+}
+
 pub async fn authenticate_homeserver(
     State(state): State<Arc<AppState>>,
     req: Request<Body>,
     next: Next,
 ) -> Result<impl IntoResponse, (StatusCode, Json<Value>)> {
 
-    if let Some(auth_header) = req
+    let token = req
         .headers()
         .get(AUTHORIZATION)
-        .and_then(|h| h.to_str().ok()) {
-        if let Some(token) = extract_token(auth_header) {
-            if token == &state.config.appservice.hs_access_token {
-                return Ok(next.run(req).await)
-            }
-        }
-    };
-
-    Err((
-        StatusCode::UNAUTHORIZED,
-        Json(json!({
-            "errcode": "M_FORBIDDEN",
-        }))
-    ))
-}
-
-pub fn extract_token(header: &str) -> Option<&str> {
-    if header.starts_with("Bearer ") {
-        Some(header.trim_start_matches("Bearer ").trim())
-    } else {
-        None
+        .ok_or_else(|| unauthorized_error())?
+        .to_str()
+        .map_err(|_| unauthorized_error())?;
+    
+    let token = extract_token(token).ok_or_else(|| unauthorized_error())?;
+    
+    if token != state.config.appservice.hs_access_token {
+        return Err(unauthorized_error());
     }
+    
+    Ok(next.run(req).await)
 }
+
+pub async fn is_admin(
+    State(state): State<Arc<AppState>>,
+    req: Request<Body>,
+    next: Next,
+) -> Result<impl IntoResponse, (StatusCode, Json<Value>)> {
+
+    let token = req
+        .headers()
+        .get(AUTHORIZATION)
+        .ok_or_else(|| unauthorized_error())?
+        .to_str()
+        .map_err(|_| unauthorized_error())?;
+    
+    let token = extract_token(token).ok_or_else(|| unauthorized_error())?;
+    
+    if token != "test" {
+        return Err(unauthorized_error());
+    }
+    
+    Ok(next.run(req).await)
+}
+
 
 #[derive(Clone)]
 pub struct Data {
