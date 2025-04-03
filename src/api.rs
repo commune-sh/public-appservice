@@ -164,7 +164,6 @@ pub async fn transactions(
                 let _ = state.appservice.join_room(room_id).await;
             }
             MembershipState::Leave => {
-                info!("Left room: {}", room_id);
                 let _ = state.appservice.leave_room(room_id).await;
             }
             MembershipState::Ban => {

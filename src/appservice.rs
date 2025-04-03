@@ -152,14 +152,35 @@ impl AppService {
     }
 
     pub async fn leave_room(&self, room_id: OwnedRoomId) -> Result<(), anyhow::Error>{
+        // First leave all child rooms
+        let hierarchy = self.client
+            .send_request(get_hierarchy::v1::Request::new(
+                room_id.clone()
+            ))
+            .await?;
 
-        let jr = self.client
+        println!("Hierarchy rooms: {:#?}", hierarchy.rooms.len());
+
+        for room in hierarchy.rooms {
+            if room.room_id == room_id {
+                continue;
+            }
+            let left = self.client
+                .send_request(leave_room::v3::Request::new(
+                    room.room_id.clone()
+                ))
+                .await?;
+            println!("Left child room: {:#?}", room.room_id);
+            tracing::info!("Left child room: {:#?}", left);
+        }
+
+        let left = self.client
             .send_request(leave_room::v3::Request::new(
                 room_id
             ))
             .await?;
 
-        tracing::info!("Left room: {:#?}", jr);
+        tracing::info!("Left room: {:#?}", left);
 
         Ok(())
     }
