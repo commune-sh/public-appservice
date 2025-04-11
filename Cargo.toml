@@ -10,7 +10,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.93"
-axum = "0.7.9"
+axum = "0.8.3"
 clap = { version = "4.5.23", features = ["derive"] }
 http = "1.1.0"
 hyper = { version = "1.5.1", features = ["full"] }
