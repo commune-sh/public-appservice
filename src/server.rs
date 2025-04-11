@@ -81,8 +81,8 @@ impl Server {
         let addr = format!("0.0.0.0:{}", &self.state.config.server.port);
 
         let service_routes = Router::new()
-            .route("/ping", post(ping))
-            .route("/transactions/:txn_id", put(transactions))
+            .route("/_matrix/app/v1/ping", post(ping))
+            .route("/_matrix/app/v1/transactions/{txn_id}", put(transactions))
             .route_layer(middleware::from_fn_with_state(self.state.clone(), authenticate_homeserver));
 
         let room_routes_inner = Router::new()
@@ -91,48 +91,48 @@ impl Server {
             .route("/info", get(room_info))
             .route("/joined_members", get(matrix_proxy))
             .route("/aliases", get(matrix_proxy))
-            .route("/event/*path", get(matrix_proxy))
-            .route("/context/*path", get(matrix_proxy))
+            .route("/event/{*path}", get(matrix_proxy))
+            .route("/context/{*path}", get(matrix_proxy))
             .route("/timestamp_to_event", get(matrix_proxy));
 
         let room_routes = Router::new()
-            .nest("/:room_id", room_routes_inner)
+            .nest("/_matrix/client/v3/rooms/{room_id}", room_routes_inner)
             .route_layer(middleware::from_fn_with_state(self.state.clone(), validate_public_room))
             .route_layer(middleware::from_fn_with_state(self.state.clone(), validate_room_id));
 
         let public_room = Router::new()
-            .route("/:room_id", get(is_public_room))
+            .route("/_matrix/client/v3/public/{room_id}", get(is_public_room))
             .route_layer(middleware::from_fn_with_state(self.state.clone(), validate_room_id));
 
 
         let more_room_routes = Router::new()
-            .route("/hierarchy", get(matrix_proxy))
-            .route("/threads", get(matrix_proxy))
-            .route("/relations/*path", get(matrix_proxy))
+            .route("/_matrix/client/v1/rooms/{room_id}/hierarchy", get(matrix_proxy))
+            .route("/_matrix/client/v1/rooms/{room_id}/threads", get(matrix_proxy))
+            .route("/_matrix/client/v1/rooms/{room_id}/relations/{*path}", get(matrix_proxy))
             .route_layer(middleware::from_fn_with_state(self.state.clone(), validate_public_room))
             .route_layer(middleware::from_fn_with_state(self.state.clone(), validate_room_id));
 
         let public_rooms_route = Router::new()
-            .route("/", get(public_rooms));
+            .route("/publicRooms", get(public_rooms));
             //.route_layer(middleware::from_fn_with_state(self.state.clone(), public_rooms_cache));
 
         let media_routes = Router::new()
-            .route("/thumbnail/*path", get(media_proxy))
-            .route("/download/*path", get(media_proxy));
+            .route("/_matrix/client/v1/media/thumbnail/{*path}", get(media_proxy))
+            .route("/_matrix/client/v1/media/download/{*path}", get(media_proxy));
 
         let admin_routes = Router::new()
-            .route("/room/:room_id/join", put(join_room))
-            .route("/room/:room_id/leave", put(leave_room))
+            .route("/admin/room/{room_id}/join", put(join_room))
+            .route("/admin/room/{room_id}/leave", put(leave_room))
             .route_layer(middleware::from_fn_with_state(self.state.clone(), is_admin));
 
         let app = Router::new()
-            .nest("/_matrix/app/v1", service_routes)
-            .nest("/_matrix/client/v3/rooms", room_routes)
-            .nest("/_matrix/client/v3/public", public_room)
-            .nest("/_matrix/client/v1/rooms/:room_id", more_room_routes)
-            .nest("/_matrix/client/v1/media", media_routes)
-            .nest("/publicRooms", public_rooms_route)
-            .nest("/admin", admin_routes)
+            .merge(service_routes)
+            .merge(room_routes)
+            .merge(public_room)
+            .merge(more_room_routes)
+            .merge(media_routes)
+            .merge(public_rooms_route)
+            .merge(admin_routes)
             .route("/version", get(version))
             .route("/identity", get(identity))
             .route("/", get(index))
