@@ -169,7 +169,7 @@ fn process_rooms(
             ..Default::default()
         };
 
-        for state_event in &room.state.clone().unwrap_or_else(|| Vec::new()) {
+        for state_event in &room.state.clone().unwrap_or(Vec::new()) {
 
             let event_type = match state_event.get_field::<String>("type") {
                 Ok(Some(t)) => t,
@@ -182,13 +182,10 @@ fn process_rooms(
             };
 
             if event_type == "m.room.create" {
-                match state_event.deserialize_as::<RoomCreateEvent>() {
-                    Ok(event) => {
-                        pub_room.origin_server_ts = Some(event.origin_server_ts());
-                        pub_room.sender = Some(event.sender().to_string());
 
-                    }
-                    Err(_) => () 
+                if let Ok(event) = state_event.deserialize_as::<RoomCreateEvent>() {
+                    pub_room.origin_server_ts = Some(event.origin_server_ts());
+                    pub_room.sender = Some(event.sender().to_string());
                 }
 
                 if let Ok(Some(content)) = state_event.get_field::<RoomCreateEventContent>("content") {
@@ -254,7 +251,7 @@ fn process_rooms(
                 };
             }
 
-            let bridge_types = vec!["m.bridge", "m.room.bridged", "m.room.discord", "m.room.irc", "uk.half-shot.bridge"];
+            let bridge_types = ["m.bridge", "m.room.bridged", "m.room.discord", "m.room.irc", "uk.half-shot.bridge"];
 
             if bridge_types.contains(&event_type.as_str()) {
                 pub_room.is_bridge = true;
@@ -263,7 +260,7 @@ fn process_rooms(
             if event_type == "m.space.child" {
 
                 if let Ok(Some(content)) = state_event.get_field::<SpaceChildEventContent>("content") {
-                    if content.via.len() == 0 {
+                    if content.via.is_empty() {
                         continue;
                     }
                 } else {
@@ -277,7 +274,7 @@ fn process_rooms(
                     if let Some(child_room) = rooms.iter().find(|r| r.room_id == state_key) {
 
 
-                        for state_event in &child_room.state.clone().unwrap_or_else(|| Vec::new()) {
+                        for state_event in &child_room.state.clone().unwrap_or(Vec::new()) {
 
                             let event_type = match state_event.get_field::<String>("type") {
                                 Ok(Some(t)) => t,

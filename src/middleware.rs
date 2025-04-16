@@ -57,11 +57,11 @@ pub async fn authenticate_homeserver(
     let token = req
         .headers()
         .get(AUTHORIZATION)
-        .ok_or_else(|| unauthorized_error())?
+        .ok_or(unauthorized_error())?
         .to_str()
         .map_err(|_| unauthorized_error())?;
     
-    let token = extract_token(token).ok_or_else(|| unauthorized_error())?;
+    let token = extract_token(token).ok_or(unauthorized_error())?;
     
     if token != state.config.appservice.hs_access_token {
         return Err(unauthorized_error());
@@ -71,7 +71,7 @@ pub async fn authenticate_homeserver(
 }
 
 pub async fn is_admin(
-    State(state): State<Arc<AppState>>,
+    //State(state): State<Arc<AppState>>,
     req: Request<Body>,
     next: Next,
 ) -> Result<impl IntoResponse, (StatusCode, Json<Value>)> {
@@ -79,11 +79,11 @@ pub async fn is_admin(
     let token = req
         .headers()
         .get(AUTHORIZATION)
-        .ok_or_else(|| unauthorized_error())?
+        .ok_or(unauthorized_error())?
         .to_str()
         .map_err(|_| unauthorized_error())?;
     
-    let token = extract_token(token).ok_or_else(|| unauthorized_error())?;
+    let token = extract_token(token).ok_or(unauthorized_error())?;
     
     if token != "test" {
         return Err(unauthorized_error());
@@ -116,7 +116,7 @@ pub async fn validate_room_id(
     };
 
     // This is a valid room_id, so move on
-    if let Ok(_) = room_id_valid(&room_id, &server_name) {
+    if room_id_valid(&room_id, &server_name).is_ok() {
         req.extensions_mut().insert(data);
         return Ok(next.run(req).await);
     }

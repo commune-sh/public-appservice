@@ -56,18 +56,17 @@ pub async fn transactions(
         // If auto-join is enabled, join rooms with world_readable history visibility
         if state.config.appservice.rules.auto_join {
             if let Ok(event) = serde_json::from_value::<RoomHistoryVisibilityEvent>(event.clone()) {
-                match event.history_visibility() {
-                    HistoryVisibility::WorldReadable => {
-                        println!("History Visibility: World Readable");
 
-                        let room_id = event.room_id().to_owned();
-                        info!("Joining room: {}", room_id);
-                        let _ =state.appservice.join_room(room_id).await;
+                if event.history_visibility() == &HistoryVisibility::WorldReadable {
+                    println!("History Visibility: World Readable");
 
-                        return Ok(Json(json!({})))
-                    }
-                    _ => {}
+                    let room_id = event.room_id().to_owned();
+                    info!("Joining room: {}", room_id);
+                    let _ =state.appservice.join_room(room_id).await;
+
+                    return Ok(Json(json!({})))
                 }
+
             }
         };
 

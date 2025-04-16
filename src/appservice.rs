@@ -68,13 +68,13 @@ impl AppService {
             .build::<HttpClient>()
             .await?;
 
-        let user_id = UserId::parse(&format!("@{}:{}", config.appservice.sender_localpart, config.matrix.server_name))?;
+        let user_id = UserId::parse(format!("@{}:{}", config.appservice.sender_localpart, config.matrix.server_name))?;
 
         let whoami = client
             .send_request(whoami::v3::Request::new())
             .await;
 
-        if let Err(_) = whoami {
+        if whoami.is_err() {
             eprintln!("Failed to authenticate with homeserver. Check your access token.");
             std::process::exit(1);
         }
@@ -93,7 +93,7 @@ impl AppService {
             self.appservice_id.to_string()
         );
 
-        req.transaction_id = Some(OwnedTransactionId::try_from(id)?);
+        req.transaction_id = Some(OwnedTransactionId::from(id));
 
         let response = self.client
             .send_request(req)
@@ -209,7 +209,7 @@ impl AppService {
         let curated = self.config.public_rooms.curated;
         let include_rooms = &self.config.public_rooms.include_rooms;
 
-        if curated && include_rooms.len() > 0 {
+        if curated && !include_rooms.is_empty() {
             // Get subset of joined rooms from config
             let mut joined_rooms: Vec<JoinedRoomState> = Vec::new();
 
@@ -275,7 +275,7 @@ impl AppService {
             .send_request(joined_rooms::v3::Request::new())
             .await?;
 
-        if jr.joined_rooms.len() == 0 {
+        if jr.joined_rooms.is_empty() {
             return Ok(None);
         }
 

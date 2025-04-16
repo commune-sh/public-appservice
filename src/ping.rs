@@ -19,6 +19,12 @@ pub struct TransactionStore {
     current_id: Arc<RwLock<Option<String>>>,
 }
 
+impl Default for TransactionStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TransactionStore {
     pub fn new() -> Self {
         Self {
