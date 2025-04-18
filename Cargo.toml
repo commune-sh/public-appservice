@@ -23,7 +23,7 @@ ruma = { version = "0.12.2", features = ["appservice-api-c", "client-hyper-nativ
 serde = { version = "1.0.215", features = ["derive"] }
 serde_json = "1.0.133"
 thiserror = "2.0.3"
-tokio = { version = "1.41.1", features = ["full"] }
+tokio = { version = "1.44.2", features = ["full"] }
 toml = "0.8.19"
 tower = "0.5.1"
 tower-http = { version = "0.6.2", features = ["cors", "normalize-path", "trace"] }
