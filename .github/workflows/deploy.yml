@@ -1,42 +1,91 @@
-name: Deploy
+name: CI
 
 on:
   push:
-    branches: [ "main" ]
-    paths: 
-      - "src/**"
-      - "Cargo.toml"
-      - "Cargo.lock"
-      - "build.rs"
-      - ".github/workflows/deploy.yml"
+    branches: [ main ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ main ]
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_HOME: ${{ github.workspace }}/.cargo
+  NIXPKGS_REF: "nixpkgs/nixpkgs-unstable"
+  RUSTFLAGS: "-D warnings"
+
+
 
 jobs:
-  deploy:
-
-    runs-on: ubuntu-24.04-arm
-
+  setup-nix:
+    runs-on: ubuntu-latest
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          extra_nix_config: |
+            allow-import-from-derivation = false
+            experimental-features = nix-command flakes
 
-    - name: Set up Rust
-      uses: dtolnay/rust-toolchain@stable
-        
-    - name: Build 
-      run: cargo build --release
-      
-    - name: Setup SSH
-      run: |
-        mkdir -p ~/.ssh
-        echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
-        chmod 600 ~/.ssh/id_ed25519
-        ssh-keyscan -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts
-        ssh-keyscan -H "${{ secrets.VPS_HOST_DEV }}" >> ~/.ssh/known_hosts
+            substituters = 
+              https://cache.nixos.org 
+              https://crane.cachix.org 
+              https://nix-community.cachix.org
 
-    - name: Upload binary 
-      run: |
-        rsync -avz --progress target/release/public-appservice ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/home/${{ secrets.VPS_USER }}/public-appservice/
-        rsync -avz --progress target/release/public-appservice ${{ secrets.VPS_USER_DEV }}@${{ secrets.VPS_HOST_DEV }}:/home/${{ secrets.VPS_USER_DEV }}/public-appservice/
+            trusted-public-keys = 
+              cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= 
+              crane.cachix.org-1:8Scfpmn9w+hGdXH/Q9tTLiYAE/2dnJYRJP7kl80GuRk= 
+              nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs=
+
+      - name: Configure Cachix
+        uses: cachix/cachix-action@v14
+        with:
+          name: crane
+              
+      - name: Configure Cargo cache
+        run: |
+          mkdir -p .github/cargo
+          echo "CARGO_HOME=$(pwd)/.github/cargo" >> $GITHUB_ENV
+
+      - uses: actions/cache@v4
+        id: nix-cache
+        with:
+          path: |
+            ~/.cache/nix
+            ~/.config/nix
+          key: ${{ runner.os }}-nix-${{ hashFiles('flake.lock') }}
+
+      - uses: actions/cache@v4
+        id: cargo-cache
+        with:
+          path: |
+            .github/cargo
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
+
+      - uses: direnv/direnv-action@v1
+        run: direnv allow
+
+  build:
+    needs: setup-nix
+    runs-on: ubuntu-latest
+    steps:
+      - name: Building
+        run: |
+          mkdir -p .cargo
+          cargo build --release --all-features
+
+      - name: Testing 
+        run: cargo test --locked --no-fail-fast
+
+  lint:
+    needs: setup-nix
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run Clippy
+        run: cargo clippy --all-targets --all-features
+
+      - name: Check formatting
+        run: cargo-fmt --all -- --check
+

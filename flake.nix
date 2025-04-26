@@ -7,21 +7,20 @@
     rust-manifest.flake = false;
 
     crane.url = "github:ipetkov/crane";
-    crane.inputs.nixpkgs.follows = "nixpkgs";
-    
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     nix-filter.url = "github:numtide/nix-filter";
     flake-parts.url = "github:hercules-ci/flake-parts";
   };
 
-  outputs = inputs @ {flake-parts, ...}:
+  outputs = inputs @ {
+    flake-parts,
+    rust-overlay,
+    nixpkgs,
+    ...
+  }:
     flake-parts.lib.mkFlake {
       inherit inputs;
     } {
-      imports = [
-        inputs.crane.flakeModule
-      ];
-
       systems = [
         "x86_64-linux"
         "aarch64-linux"
@@ -35,6 +34,14 @@
         system,
         ...
       }: let
+        pkgs = import nixpkgs {
+          inherit system;
+          overlays = [rust-overlay.overlays.default];
+        };
+
+        # Create craneLib with our custom rust toolchain
+        craneLib = (inputs.crane.mkLib pkgs).overrideToolchain rustToolchain;
+
         # Setup rust-overlay
         rustToolchain =
           (pkgs.rust-bin.fromRustupToolchainFile
@@ -50,9 +57,6 @@
               ]
               ++ (pkgs.lib.importTOML ./rust-toolchain.toml).toolchain.components;
           };
-
-        # Create craneLib with our custom rust toolchain
-        craneLib = (inputs.crane.mkLib pkgs).overrideToolchain rustToolchain;
 
         cargoManifest = pkgs.lib.importTOML "${inputs.self}/Cargo.toml";
 
