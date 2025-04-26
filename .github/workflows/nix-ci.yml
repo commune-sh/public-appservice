@@ -1,0 +1,91 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_HOME: ${{ github.workspace }}/.cargo
+  NIXPKGS_REF: "nixpkgs/nixpkgs-unstable"
+  RUSTFLAGS: "-D warnings"
+
+
+
+jobs:
+  setup-nix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          extra_nix_config: |
+            allow-import-from-derivation = false
+            experimental-features = nix-command flakes
+
+            substituters = 
+              https://cache.nixos.org 
+              https://crane.cachix.org 
+              https://nix-community.cachix.org
+
+            trusted-public-keys = 
+              cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= 
+              crane.cachix.org-1:8Scfpmn9w+hGdXH/Q9tTLiYAE/2dnJYRJP7kl80GuRk= 
+              nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs=
+
+      - name: Configure Cachix
+        uses: cachix/cachix-action@v14
+        with:
+          name: crane
+              
+      - name: Configure Cargo cache
+        run: |
+          mkdir -p .github/cargo
+          echo "CARGO_HOME=$(pwd)/.github/cargo" >> $GITHUB_ENV
+
+      - uses: actions/cache@v4
+        id: nix-cache
+        with:
+          path: |
+            ~/.cache/nix
+            ~/.config/nix
+          key: ${{ runner.os }}-nix-${{ hashFiles('flake.lock') }}
+
+      - uses: actions/cache@v4
+        id: cargo-cache
+        with:
+          path: |
+            .github/cargo
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
+
+      - uses: direnv/direnv-action@v1
+        run: direnv allow
+
+  build:
+    needs: setup-nix
+    runs-on: ubuntu-latest
+    steps:
+      - name: Building
+        run: |
+          mkdir -p .cargo
+          cargo build --release --all-features
+
+      - name: Testing 
+        run: cargo test --locked --no-fail-fast
+
+  lint:
+    needs: setup-nix
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run Clippy
+        run: cargo clippy --all-targets --all-features
+
+      - name: Check formatting
+        run: cargo-fmt --all -- --check
+
