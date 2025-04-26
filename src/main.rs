@@ -1,5 +1,7 @@
-use public_appservice::*; 
+use std::process::ExitCode;
+
 use config::Config;
+use public_appservice::*;
 use server::Server;
 
 use tracing::info;
@@ -8,31 +10,28 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use crate::AppState;
 
 #[tokio::main]
-async fn main() {
-
+async fn main() -> ExitCode {
     setup_tracing();
 
     let args = Args::build();
 
     let config = Config::new(&args.config);
 
-    let state = AppState::new(config.clone())
-        .await
-        .unwrap_or_else(|e| {
-            eprintln!("Failed to initialize state: {}", e);
-            std::process::exit(1);
-        });
+    let Ok(state) = AppState::new(config.clone()).await else {
+        eprintln!("Failed to initialize state: {error}");
+
+        return ExitCode::FAILURE;
+    };
 
     info!("Starting Commune public appservice...");
 
-    Server::new(state)
-    .run()
-    .await 
-    .unwrap_or_else(|e| {
-        eprintln!("Server error: {}", e);
-        std::process::exit(1);
-    }); 
+    if let Err(error) = Server::new(state).run().await {
+        eprintln!("Error: {error}");
 
+        ExitCode::FAILURE
+    } else {
+        ExitCode::SUCCESS
+    }
 }
 
 pub fn setup_tracing() {
