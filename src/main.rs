@@ -1,5 +1,7 @@
 use std::process::ExitCode;
 
+use clap::Parser as _;
+use cli::Args;
 use config::Config;
 use public_appservice::*;
 use server::Server;
@@ -9,11 +11,13 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::AppState;
 
+mod cli;
+
 #[tokio::main]
 async fn main() -> Result<(), ExitCode> {
     setup_tracing();
 
-    let args = Args::build();
+    let args = Args::parse();
 
     let config = Config::new(&args.config);
 
