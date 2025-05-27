@@ -1,5 +1,5 @@
-use public_appservice::*; 
 use config::Config;
+use public_appservice::*;
 use server::Server;
 
 use tracing::info;
@@ -9,30 +9,23 @@ use crate::AppState;
 
 #[tokio::main]
 async fn main() {
-
     setup_tracing();
 
     let args = Args::build();
 
     let config = Config::new(&args.config);
 
-    let state = AppState::new(config.clone())
-        .await
-        .unwrap_or_else(|e| {
-            eprintln!("Failed to initialize state: {}", e);
-            std::process::exit(1);
-        });
+    let state = AppState::new(config.clone()).await.unwrap_or_else(|e| {
+        eprintln!("Failed to initialize state: {}", e);
+        std::process::exit(1);
+    });
 
     info!("Starting Commune public appservice...");
 
-    Server::new(state)
-    .run()
-    .await 
-    .unwrap_or_else(|e| {
+    Server::new(state).run().await.unwrap_or_else(|e| {
         eprintln!("Server error: {}", e);
         std::process::exit(1);
-    }); 
-
+    });
 }
 
 pub fn setup_tracing() {

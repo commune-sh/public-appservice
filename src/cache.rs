@@ -1,9 +1,6 @@
 use crate::config::Config;
 
-use redis::{
-    AsyncCommands,
-    RedisError
-};
+use redis::{AsyncCommands, RedisError};
 
 use crate::rooms::PublicRoom;
 
@@ -52,7 +49,6 @@ pub async fn get_cached_room_state(
     conn: &mut redis::aio::MultiplexedConnection,
     room_id: &str,
 ) -> Result<Vec<PublicRoom>, RedisError> {
-
     let key = format!("room_state:{}", room_id);
 
     let data: String = conn.get(key).await?;
@@ -64,4 +60,3 @@ pub async fn get_cached_room_state(
         ))
     })
 }
-

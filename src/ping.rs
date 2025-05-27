@@ -1,18 +1,13 @@
-use axum::{
-    extract::State,
-    response::IntoResponse,
-    Json,
-};
+use axum::{extract::State, response::IntoResponse, Json};
 
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
-use serde_json::json;
 use serde::Deserialize;
+use serde_json::json;
 
-use crate::AppState;
-use crate::error::AppserviceError;
+use crate::{error::AppserviceError, AppState};
 
 #[derive(Debug, Clone)]
 pub struct TransactionStore {
@@ -60,10 +55,13 @@ pub async fn ping(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<PingRequest>,
 ) -> Result<impl IntoResponse, AppserviceError> {
-
     let txn_id = payload.transaction_id.clone();
 
-    if !state.transaction_store.verify_and_remove_transaction(&txn_id).await {
+    if !state
+        .transaction_store
+        .verify_and_remove_transaction(&txn_id)
+        .await
+    {
         println!("Transaction ID does not match: {}", txn_id);
     }
 

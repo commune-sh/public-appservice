@@ -1,7 +1,5 @@
-use serde::{Serialize, Deserialize};
-use std::{fs, process};
-use std::path::Path;
-
+use serde::{Deserialize, Serialize};
+use std::{fs, path::Path, process};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
@@ -61,13 +59,12 @@ fn default_timeout_secs() -> u64 {
 }
 
 fn default_cache_ttl() -> u64 {
-    300 
+    300
 }
 
 fn default_false() -> bool {
     false
 }
-
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Cache {
@@ -90,10 +87,8 @@ pub struct PublicRooms {
     pub include_rooms: Vec<String>,
 }
 
-
 impl Config {
     pub fn new(path: impl AsRef<Path>) -> Self {
-
         let path = path.as_ref();
 
         let config_content = match fs::read_to_string(path) {
@@ -103,7 +98,7 @@ impl Config {
                 process::exit(1);
             }
         };
-        
+
         match toml::from_str(&config_content) {
             Ok(config) => config,
             Err(e) => {
@@ -113,4 +108,3 @@ impl Config {
         }
     }
 }
-
