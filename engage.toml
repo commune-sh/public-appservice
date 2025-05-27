@@ -1,0 +1,110 @@
+interpreter = ["bash", "-euo", "pipefail", "-c"]
+
+[[task]]
+name = "lychee"
+group = "lints"
+script = "lychee --offline ."
+
+[[task]]
+name = "mado"
+group = "lints"
+script = "mado check --exclude ./README.md"
+
+[[task]]
+name = "cargo-fmt"
+group = "lints"
+script = "cargo fmt --check -- --color=always"
+
+[[task]]
+name = "cargo-sort"
+group = "lints"
+script = "cargo sort --check"
+
+[[task]]
+name = "cargo-audit"
+group = "misc"
+script = "cargo audit"
+
+[[task]]
+name = "cargo-machete"
+group = "misc"
+script = "cargo machete"
+
+[[task]]
+name = "cargo-doc"
+group = "lints"
+script = """
+RUSTDOCFLAGS="-D warnings" cargo doc \
+    --workspace \
+    --no-deps \
+    --document-private-items \
+    --color always
+"""
+
+[[task]]
+name = "cargo-clippy/none"
+group = "lints"
+script = """
+cargo clippy \
+    --workspace \
+    --all-targets \
+    --no-default-features \
+    --color=always \
+    -- \
+    -D warnings
+"""
+
+[[task]]
+name = "cargo-clippy/default"
+group = "lints"
+script = """
+    cargo clippy \
+    --workspace \
+    --all-targets \
+    --color=always \
+    -- \
+    -D warnings
+"""
+
+[[task]]
+name = "cargo-clippy/all"
+group = "lints"
+script = """
+env DIRENV_DEVSHELL=all-features \
+    direnv exec . \
+    cargo clippy \
+        --workspace \
+        --all-targets \
+        --all-features \
+        --color=always \
+        -- \
+        -D warnings
+"""
+
+[[task]]
+name = "cargo/default"
+group = "tests"
+script = """
+cargo test \
+    --workspace \
+    --all-targets \
+    --color=always \
+    -- \
+    --color=always
+"""
+
+[[task]]
+name = "cargo/all"
+group = "tests"
+script = """
+env DIRENV_DEVSHELL=all-features \
+    direnv exec . \
+    cargo test \
+        --all-features \
+        --workspace \
+        --all-targets \
+        --color=always \
+        -- \
+        --color=always
+"""
+

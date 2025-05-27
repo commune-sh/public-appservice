@@ -1148,7 +1148,6 @@ dependencies = [
  "axum",
  "clap",
  "http",
- "hyper",
  "hyper-util",
  "once_cell",
  "redis",

@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_HOME: ${{ github.workspace }}/.cargo
+  NIXPKGS_REF: "nixpkgs/nixpkgs-unstable"
+  ENABLE_ARTIFACTS: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup
+
+      - name: Install engage
+        run: |
+          nix profile install --impure --inputs-from . nixpkgs#direnv nixpkgs#nix-direnv
+          echo "use flake" >> .envrc
+          direnv allow
+
+      - run: direnv exec . engage
+
+  artifacts:
+      needs: ci
+      runs-on: ubuntu-latest
+      steps:
+        - name: Checkout code
+          uses: actions/checkout@v4
+
+        - uses: ./.github/actions/setup
+
+        - name: Build artifacts
+          run: nix build
+
+        - uses: actions/upload-artifact@v4
+          if: ${{ env.ENABLE_ARTIFACTS }}
+          with:
+            name: artifacts
+            path: result/bin/**
+
