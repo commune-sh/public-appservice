@@ -1,65 +1,55 @@
 use axum::{
-    extract::{Path, State, Query},
+    extract::{Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
-    Json,
-    Extension
+    Extension, Json,
 };
 
 use ruma::{
-    RoomId,
-    EventId,
-    MilliSecondsSinceUnixEpoch,
-    OwnedMxcUri,
     events::{
-        AnyTimelineEvent,
         room::{
-            create::{RoomCreateEvent, RoomCreateEventContent},
-            name::RoomNameEventContent,
-            canonical_alias::RoomCanonicalAliasEventContent,
             avatar::RoomAvatarEventContent,
-            topic::RoomTopicEventContent,
+            canonical_alias::RoomCanonicalAliasEventContent,
+            create::{RoomCreateEvent, RoomCreateEventContent},
             history_visibility::RoomHistoryVisibilityEventContent,
-            join_rules::{RoomJoinRulesEventContent, JoinRule},
+            join_rules::{JoinRule, RoomJoinRulesEventContent},
+            name::RoomNameEventContent,
+            topic::RoomTopicEventContent,
         },
-        space::child::SpaceChildEventContent, 
-    }
+        space::child::SpaceChildEventContent,
+        AnyTimelineEvent,
+    },
+    EventId, MilliSecondsSinceUnixEpoch, OwnedMxcUri, RoomId,
 };
 
-use serde::{Serialize, Deserialize};
-use serde_json::{
-    json, 
-    Value
-};
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 
 use std::sync::Arc;
 
-use crate::AppState;
-use crate::appservice::{
-    JoinedRoomState,
-    RoomSummary
+use crate::{
+    appservice::{JoinedRoomState, RoomSummary},
+    AppState,
 };
 
 use crate::middleware::Data;
 
 use crate::utils;
 
-use crate::cache::{
-    get_cached_rooms,
-    cache_rooms
-};
+use crate::cache::{cache_rooms, get_cached_rooms};
 
 use crate::error::AppserviceError;
 
 use tracing::{info, warn};
 
-pub async fn public_rooms (
+pub async fn public_rooms(
     State(state): State<Arc<AppState>>,
 ) -> Result<impl IntoResponse, AppserviceError> {
-
     // read from cache if enabled
     if state.config.cache.public_rooms.enabled {
-        let mut redis_conn = state.cache.get_multiplexed_async_connection()
+        let mut redis_conn = state
+            .cache
+            .get_multiplexed_async_connection()
             .await
             .map_err(|_| AppserviceError::MatrixError("Failed to fetch rooms".to_string()))?;
 
@@ -69,19 +59,19 @@ pub async fn public_rooms (
                 StatusCode::OK,
                 Json(json!({
                     "rooms": json!(cached_data),
-                }))
-            ))
+                })),
+            ));
         }
     }
 
-    let rooms = match state.appservice.joined_rooms_state()
-        .await {
-            Ok(Some(rooms)) => rooms,
-            Ok(None) | Err(_) => {
-                return Err(AppserviceError::MatrixError("Failed to fetch rooms".to_string()));
-            }
-        };
-
+    let rooms = match state.appservice.joined_rooms_state().await {
+        Ok(Some(rooms)) => rooms,
+        Ok(None) | Err(_) => {
+            return Err(AppserviceError::MatrixError(
+                "Failed to fetch rooms".to_string(),
+            ));
+        }
+    };
 
     let state_copy = state.clone();
 
@@ -92,15 +82,16 @@ pub async fn public_rooms (
     // cache public rooms if enabled
     if state.config.cache.public_rooms.enabled {
         tokio::spawn(async move {
-            let mut redis_conn = state.cache.get_multiplexed_async_connection()
-                .await;
+            let mut redis_conn = state.cache.get_multiplexed_async_connection().await;
 
             if let Ok(ref mut redis_conn) = redis_conn {
                 if let Err(e) = cache_rooms(
-                    redis_conn, 
+                    redis_conn,
                     &to_cache,
-                    state.config.cache.public_rooms.expire_after
-                ).await {
+                    state.config.cache.public_rooms.expire_after,
+                )
+                .await
+                {
                     warn!("Failed to cache public rooms: {}", e);
                 } else {
                     info!("Public rooms cached");
@@ -113,7 +104,7 @@ pub async fn public_rooms (
         StatusCode::OK,
         Json(json!({
             "rooms": json!(processed),
-        }))
+        })),
     ))
 }
 
@@ -155,22 +146,16 @@ fn is_false(b: &bool) -> bool {
     !*b
 }
 
-fn process_rooms(
-    _state: Arc<AppState>,
-    rooms: Vec<JoinedRoomState>
-) -> Vec<PublicRoom> {
-
+fn process_rooms(_state: Arc<AppState>, rooms: Vec<JoinedRoomState>) -> Vec<PublicRoom> {
     let mut public_rooms: Vec<PublicRoom> = Vec::new();
 
     for room in &rooms {
-
         let mut pub_room = PublicRoom {
             room_id: room.room_id.to_string(),
             ..Default::default()
         };
 
         for state_event in &room.state.clone().unwrap_or(Vec::new()) {
-
             let event_type = match state_event.get_field::<String>("type") {
                 Ok(Some(t)) => t,
                 Ok(None) => {
@@ -182,13 +167,14 @@ fn process_rooms(
             };
 
             if event_type == "m.room.create" {
-
                 if let Ok(event) = state_event.deserialize_as::<RoomCreateEvent>() {
                     pub_room.origin_server_ts = Some(event.origin_server_ts());
                     pub_room.sender = Some(event.sender().to_string());
                 }
 
-                if let Ok(Some(content)) = state_event.get_field::<RoomCreateEventContent>("content") {
+                if let Ok(Some(content)) =
+                    state_event.get_field::<RoomCreateEventContent>("content")
+                {
                     if let Some(room_type) = content.room_type {
                         pub_room.room_type = Some(room_type.to_string());
                     }
@@ -197,44 +183,54 @@ fn process_rooms(
 
             // don't overwrite the name if commune.room.name is already set
             if event_type == "m.room.name" && pub_room.name.is_none() {
-                if let Ok(Some(content)) = state_event.get_field::<RoomNameEventContent>("content") {
+                if let Ok(Some(content)) = state_event.get_field::<RoomNameEventContent>("content")
+                {
                     pub_room.name = Some(content.name.to_string());
                 };
             }
 
             if event_type == "commune.room.name" {
-                if let Ok(Some(content)) = state_event.get_field::<RoomNameEventContent>("content") {
-
+                if let Ok(Some(content)) = state_event.get_field::<RoomNameEventContent>("content")
+                {
                     pub_room.name = Some(content.name.to_string());
                 };
             }
 
             if event_type == "m.room.canonical_alias" {
-                if let Ok(Some(content)) = state_event.get_field::<RoomCanonicalAliasEventContent>("content") {
+                if let Ok(Some(content)) =
+                    state_event.get_field::<RoomCanonicalAliasEventContent>("content")
+                {
                     pub_room.canonical_alias = content.alias.map(|a| a.to_string());
                 };
             }
 
             if event_type == "m.room.avatar" {
-                if let Ok(Some(content)) = state_event.get_field::<RoomAvatarEventContent>("content") {
+                if let Ok(Some(content)) =
+                    state_event.get_field::<RoomAvatarEventContent>("content")
+                {
                     pub_room.avatar_url = content.url.map(|u| u.to_string());
                 };
             }
 
             if event_type == "m.room.topic" {
-                if let Ok(Some(content)) = state_event.get_field::<RoomTopicEventContent>("content") {
+                if let Ok(Some(content)) = state_event.get_field::<RoomTopicEventContent>("content")
+                {
                     pub_room.topic = Some(content.topic.to_string());
                 };
             }
 
             if event_type == "m.room.history_visibility" {
-                if let Ok(Some(content)) = state_event.get_field::<RoomHistoryVisibilityEventContent>("content") {
+                if let Ok(Some(content)) =
+                    state_event.get_field::<RoomHistoryVisibilityEventContent>("content")
+                {
                     pub_room.history_visibility = content.history_visibility.to_string();
                 };
             }
 
             if event_type == "commune.room.banner" {
-                if let Ok(Some(content)) = state_event.get_field::<RoomAvatarEventContent>("content") {
+                if let Ok(Some(content)) =
+                    state_event.get_field::<RoomAvatarEventContent>("content")
+                {
                     pub_room.banner_url = content.url.map(|u| u.to_string());
                 };
             }
@@ -246,20 +242,29 @@ fn process_rooms(
             }
 
             if event_type == "m.room.join_rules" {
-                if let Ok(Some(content)) = state_event.get_field::<RoomJoinRulesEventContent>("content") {
+                if let Ok(Some(content)) =
+                    state_event.get_field::<RoomJoinRulesEventContent>("content")
+                {
                     pub_room.join_rule = Some(content.join_rule.as_str().to_string());
                 };
             }
 
-            let bridge_types = ["m.bridge", "m.room.bridged", "m.room.discord", "m.room.irc", "uk.half-shot.bridge"];
+            let bridge_types = [
+                "m.bridge",
+                "m.room.bridged",
+                "m.room.discord",
+                "m.room.irc",
+                "uk.half-shot.bridge",
+            ];
 
             if bridge_types.contains(&event_type.as_str()) {
                 pub_room.is_bridge = true;
             }
 
             if event_type == "m.space.child" {
-
-                if let Ok(Some(content)) = state_event.get_field::<SpaceChildEventContent>("content") {
+                if let Ok(Some(content)) =
+                    state_event.get_field::<SpaceChildEventContent>("content")
+                {
                     if content.via.is_empty() {
                         continue;
                     }
@@ -272,10 +277,7 @@ fn process_rooms(
 
                     // find the room in the rooms vec
                     if let Some(child_room) = rooms.iter().find(|r| r.room_id == state_key) {
-
-
                         for state_event in &child_room.state.clone().unwrap_or(Vec::new()) {
-
                             let event_type = match state_event.get_field::<String>("type") {
                                 Ok(Some(t)) => t,
                                 Ok(None) => {
@@ -287,22 +289,17 @@ fn process_rooms(
                             };
 
                             if event_type == "m.room.join_rules" {
-                                if let Ok(Some(content)) = state_event.get_field::<RoomJoinRulesEventContent>("content") {
-
+                                if let Ok(Some(content)) =
+                                    state_event.get_field::<RoomJoinRulesEventContent>("content")
+                                {
                                     if matches!(content.join_rule, JoinRule::Public) {
                                         //is_public = true;
-                                        break; 
+                                        break;
                                     }
                                 };
                             }
-
                         }
-
-                        
                     }
-
-
-
 
                     match pub_room.children {
                         Some(ref mut children) => {
@@ -312,19 +309,15 @@ fn process_rooms(
                             pub_room.children = Some(vec![state_key]);
                         }
                     }
-
                 };
-
             }
-
         }
 
-        if let Some(name) =  &pub_room.name {
+        if let Some(name) = &pub_room.name {
             if name.contains("[⛓️]") {
-                continue
-            } 
-        } 
-
+                continue;
+            }
+        }
 
         public_rooms.push(pub_room);
     }
@@ -364,13 +357,12 @@ pub struct Sender {
     pub displayname: Option<String>,
 }
 
-pub async fn room_info (
+pub async fn room_info(
     Path(params): Path<Vec<(String, String)>>,
     Extension(data): Extension<Data>,
     Query(query): Query<RoomInfoParams>,
     State(state): State<Arc<AppState>>,
 ) -> Result<impl IntoResponse, AppserviceError> {
-
     let mut room_id = params[0].1.clone();
 
     if let Some(id) = data.room_id.as_ref() {
@@ -382,7 +374,9 @@ pub async fn room_info (
     let mut parsed_id = RoomId::parse(&room_id)
         .map_err(|_| AppserviceError::MatrixError("Invalid room ID".to_string()))?;
 
-    let summary =  state.appservice.get_room_summary(parsed_id.clone())
+    let summary = state
+        .appservice
+        .get_room_summary(parsed_id.clone())
         .await
         .map_err(|_| AppserviceError::MatrixError("Room not found".to_string()))?;
 
@@ -394,72 +388,68 @@ pub async fn room_info (
     };
 
     if let Some(alias) = query.room {
-
-        let hierarchy = state.appservice.get_room_hierarchy(parsed_id.clone())
+        let hierarchy = state
+            .appservice
+            .get_room_hierarchy(parsed_id.clone())
             .await
-            .map_err(|_| AppserviceError::MatrixError("Failed to fetch room hierarchy".to_string()))?;
+            .map_err(|_| {
+                AppserviceError::MatrixError("Failed to fetch room hierarchy".to_string())
+            })?;
 
         for room in hierarchy {
-
             if let Some(name) = room.name.as_ref() {
                 let slug = utils::slugify(name);
 
                 if slug == alias {
                     parsed_id = room.room_id.clone();
 
-                    let summary = state.appservice.get_room_summary(parsed_id.clone())
+                    let summary = state
+                        .appservice
+                        .get_room_summary(parsed_id.clone())
                         .await
                         .map_err(|_| AppserviceError::MatrixError("Room not found".to_string()))?;
 
                     info.room = Some(summary);
                     break;
                 }
-
             }
-
         }
-
-
     }
 
     if let Some(event_id) = query.event {
         let parsed_event_id = EventId::parse(&event_id)
             .map_err(|_| AppserviceError::MatrixError("Invalid event ID".to_string()))?;
 
-
-        let event = state.appservice.get_room_event(parsed_id, parsed_event_id)
+        let event = state
+            .appservice
+            .get_room_event(parsed_id, parsed_event_id)
             .await
             .map_err(|_| AppserviceError::MatrixError("Event not found".to_string()))?;
 
-            info.event = Some(event.clone());
+        info.event = Some(event.clone());
 
-            if let Ok(Some(sender)) = event.get_field::<String>("sender") {
-                println!("sender: {:#?}", sender);
+        if let Ok(Some(sender)) = event.get_field::<String>("sender") {
+            println!("sender: {:#?}", sender);
 
-                let profile = state.appservice.get_profile(sender)
-                    .await
-                    .map_err(|_| AppserviceError::MatrixError("Failed to fetch profile".to_string()))?;
+            let profile =
+                state.appservice.get_profile(sender).await.map_err(|_| {
+                    AppserviceError::MatrixError("Failed to fetch profile".to_string())
+                })?;
 
-                info.sender = Some(Sender {
-                    avatar_url: profile.avatar_url,
-                    displayname: profile.displayname,
-                });
-
-            }
+            info.sender = Some(Sender {
+                avatar_url: profile.avatar_url,
+                displayname: profile.displayname,
+            });
+        }
     }
 
-
-    Ok((
-        StatusCode::OK,
-        Json(json!(info))
-    ))
+    Ok((StatusCode::OK, Json(json!(info))))
 }
 
-pub async fn join_room (
+pub async fn join_room(
     State(state): State<Arc<AppState>>,
     Path(room_id): Path<String>,
 ) -> Result<impl IntoResponse, AppserviceError> {
-
     println!("Requested to join room: {}", room_id);
 
     let room_id = RoomId::parse(&room_id)
@@ -471,15 +461,14 @@ pub async fn join_room (
         StatusCode::OK,
         Json(json!({
             "joined": true
-        }))
+        })),
     ))
 }
 
-pub async fn leave_room (
+pub async fn leave_room(
     State(state): State<Arc<AppState>>,
     Path(room_id): Path<String>,
 ) -> Result<impl IntoResponse, AppserviceError> {
-
     println!("Requested to leave room: {}", room_id);
 
     let room_id = RoomId::parse(&room_id)
@@ -491,7 +480,6 @@ pub async fn leave_room (
         StatusCode::OK,
         Json(json!({
             "left": true
-        }))
+        })),
     ))
 }
-

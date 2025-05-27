@@ -1,18 +1,18 @@
-pub mod config;
-pub mod appservice;
-pub mod server;
-pub mod ping;
 pub mod api;
-pub mod rooms;
-pub mod middleware;
+pub mod appservice;
 pub mod cache;
+pub mod config;
 pub mod error;
-pub mod utils;
+pub mod middleware;
 pub mod oidc;
+pub mod ping;
+pub mod rooms;
+pub mod server;
+pub mod utils;
 
-use std::sync::Arc;
 use axum::body::Body;
 use hyper_util::{client::legacy::connect::HttpConnector, rt::TokioExecutor};
+use std::sync::Arc;
 
 pub type ProxyClient = hyper_util::client::legacy::Client<HttpConnector, Body>;
 
@@ -68,4 +68,3 @@ impl Args {
         Args::parse()
     }
 }
-
