@@ -1,72 +1,59 @@
 use axum::{
     body::Body,
     extract::{MatchedPath, OriginalUri, Path, State},
-    http::{header::AUTHORIZATION, Request, StatusCode, Uri},
+    http::{Request, StatusCode, Uri},
     middleware::Next,
     response::IntoResponse,
-    Extension, Json,
+    Extension, Json, RequestPartsExt,
 };
 
+use axum_extra::{
+    headers::{authorization::Bearer, Authorization},
+    TypedHeader,
+};
 use ruma::{RoomAliasId, RoomId};
 
 use serde_json::{json, Value};
 
 use std::sync::Arc;
 
-use crate::{utils::room_id_valid, AppState};
+use crate::{utils::room_id_valid, Application};
 
-use crate::error::AppserviceError;
+use crate::error::serve::Main as Error;
 
-pub fn extract_token(header: &str) -> Option<&str> {
-    header.strip_prefix("Bearer ").map(|token| token.trim())
-}
+async fn extract_bearer_token(req: Request<Body>) -> (String, Request<Body>) {
+    let (mut parts, body) = req.into_parts();
 
-fn unauthorized_error() -> (StatusCode, Json<Value>) {
-    (
-        StatusCode::UNAUTHORIZED,
-        Json(json!({
-            "errcode": "M_FORBIDDEN",
-        })),
-    )
+    let auth_header: Option<TypedHeader<Authorization<Bearer>>> = parts.extract().await.unwrap();
+
+    let token = auth_header.map(|bearer| bearer.token().to_owned()).unwrap();
+
+    (token, http::Request::from_parts(parts, body))
 }
 
 pub async fn authenticate_homeserver(
-    State(state): State<Arc<AppState>>,
+    State(app): State<Arc<Application>>,
     req: Request<Body>,
     next: Next,
-) -> Result<impl IntoResponse, (StatusCode, Json<Value>)> {
-    let token = req
-        .headers()
-        .get(AUTHORIZATION)
-        .ok_or(unauthorized_error())?
-        .to_str()
-        .map_err(|_| unauthorized_error())?;
+) -> Result<axum::response::Response, ()> {
+    let (token, req) = extract_bearer_token(req).await;
 
-    let token = extract_token(token).ok_or(unauthorized_error())?;
-
-    if token != state.config.appservice.hs_access_token {
-        return Err(unauthorized_error());
+    if token != app.config.appservice.hs_access_token {
+        panic!()
     }
 
     Ok(next.run(req).await)
 }
 
 pub async fn is_admin(
-    //State(state): State<Arc<AppState>>,
+    //State(state): State<Arc<Application>>,
     req: Request<Body>,
     next: Next,
-) -> Result<impl IntoResponse, (StatusCode, Json<Value>)> {
-    let token = req
-        .headers()
-        .get(AUTHORIZATION)
-        .ok_or(unauthorized_error())?
-        .to_str()
-        .map_err(|_| unauthorized_error())?;
-
-    let token = extract_token(token).ok_or(unauthorized_error())?;
+) -> Result<axum::response::Response, ()> {
+    let (token, req) = extract_bearer_token(req).await;
 
     if token != "test" {
-        return Err(unauthorized_error());
+        panic!()
     }
 
     Ok(next.run(req).await)
@@ -80,7 +67,7 @@ pub struct Data {
 
 pub async fn validate_room_id(
     Path(params): Path<Vec<(String, String)>>,
-    State(state): State<Arc<AppState>>,
+    State(state): State<Arc<Application>>,
     mut req: Request<Body>,
     next: Next,
 ) -> Result<impl IntoResponse, (StatusCode, Json<Value>)> {
@@ -159,28 +146,25 @@ pub async fn validate_room_id(
 pub async fn validate_public_room(
     Extension(data): Extension<Data>,
     //Path(params): Path<Vec<(String, String)>>,
-    State(state): State<Arc<AppState>>,
+    State(state): State<Arc<Application>>,
     req: Request<Body>,
     next: Next,
-) -> Result<impl IntoResponse, AppserviceError> {
+) -> Result<impl IntoResponse, Error> {
     let room_id = data
         .room_id
         .as_ref()
-        .ok_or(AppserviceError::AppserviceError(
-            "No room ID found".to_string(),
-        ))?;
+        .ok_or(Error::Appservice("No room ID found"))?;
 
-    let id = RoomId::parse(room_id)
-        .map_err(|_| AppserviceError::AppserviceError("Invalid room ID".to_string()))?;
+    let id = RoomId::parse(room_id).map_err(|_| Error::Appservice("Invalid room ID"))?;
 
-    let joined = state.appservice.has_joined_room(id).await.map_err(|_| {
-        AppserviceError::AppserviceError("Failed to check room membership".to_string())
-    })?;
+    let joined = state
+        .appservice
+        .has_joined_room(id)
+        .await
+        .map_err(|_| Error::Appservice("Failed to check room membership"))?;
 
     if !joined {
-        return Err(AppserviceError::AppserviceError(
-            "User is not in room".to_string(),
-        ));
+        return Err(Error::Appservice("User is not in room"));
     }
 
     Ok(next.run(req).await)
@@ -188,21 +172,20 @@ pub async fn validate_public_room(
 
 pub async fn is_public_room(
     Extension(data): Extension<Data>,
-    State(state): State<Arc<AppState>>,
-) -> Result<impl IntoResponse, AppserviceError> {
+    State(state): State<Arc<Application>>,
+) -> Result<impl IntoResponse, Error> {
     let room_id = data
         .room_id
         .as_ref()
-        .ok_or(AppserviceError::AppserviceError(
-            "No room ID found".to_string(),
-        ))?;
+        .ok_or(Error::Appservice("No room ID found"))?;
 
-    let id = RoomId::parse(room_id)
-        .map_err(|_| AppserviceError::AppserviceError("Invalid room ID".to_string()))?;
+    let id = RoomId::parse(room_id).map_err(|_| Error::Appservice("Invalid room ID"))?;
 
-    let joined = state.appservice.has_joined_room(id).await.map_err(|_| {
-        AppserviceError::AppserviceError("Failed to check room membership".to_string())
-    })?;
+    let joined = state
+        .appservice
+        .has_joined_room(id)
+        .await
+        .map_err(|_| Error::Appservice("Failed to check room membership"))?;
 
     if joined {
         return Ok((

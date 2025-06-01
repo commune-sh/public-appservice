@@ -3,10 +3,10 @@ use axum::{
     http::HeaderValue,
     middleware::{self},
     response::IntoResponse,
-    routing::{get, post, put},
+    routing::{get, put},
     Json, Router, ServiceExt,
 };
-
+use ext::RouterExt as _;
 use std::sync::Arc;
 use tracing::info;
 
@@ -24,6 +24,7 @@ use http::header::CONTENT_TYPE;
 use anyhow;
 
 use crate::{
+    api::{event, ping},
     config::Config,
     middleware::{
         authenticate_homeserver, is_admin, is_public_room, validate_public_room, validate_room_id,
@@ -31,18 +32,18 @@ use crate::{
     rooms::{join_room, leave_room, public_rooms, room_info},
 };
 
-use crate::ping::ping;
+use crate::api::{matrix_proxy, media_proxy};
 
-use crate::api::{matrix_proxy, media_proxy, transactions};
+pub mod ext;
 
 pub struct Server {
-    state: Arc<AppState>,
+    state: Arc<Application>,
 }
 
-pub use crate::AppState;
+pub use crate::Application;
 
 impl Server {
-    pub fn new(state: Arc<AppState>) -> Self {
+    pub fn new(state: Arc<Application>) -> Self {
         Self { state }
     }
 
@@ -75,8 +76,8 @@ impl Server {
         let addr = format!("0.0.0.0:{}", &self.state.config.server.port);
 
         let service_routes = Router::new()
-            .route("/_matrix/app/v1/ping", post(ping))
-            .route("/_matrix/app/v1/transactions/{txn_id}", put(transactions))
+            .ruma_route(ping::send_ping_route)
+            .ruma_route(event::push_events_route)
             .route_layer(middleware::from_fn_with_state(
                 self.state.clone(),
                 authenticate_homeserver,
@@ -169,8 +170,11 @@ impl Server {
 
         tokio::spawn(async move {
             info!("Pinging homeserver...");
-            let txn_id = ping_state.transaction_store.generate_transaction_id().await;
-            let ping = ping_state.appservice.ping_homeserver(txn_id.clone()).await;
+            let txn_id = ping_state.txn_store.generate_txn_id().await;
+            let ping = ping_state
+                .appservice
+                .ping_homeserver(txn_id.to_string())
+                .await;
             match ping {
                 Ok(_) => info!("Homeserver pinged successfully."),
                 Err(e) => eprintln!("Failed to ping homeserver: {}", e),
@@ -202,7 +206,7 @@ pub async fn version() -> Result<impl IntoResponse, ()> {
     })))
 }
 
-pub async fn identity(State(state): State<Arc<AppState>>) -> Result<impl IntoResponse, ()> {
+pub async fn identity(State(state): State<Arc<Application>>) -> Result<impl IntoResponse, ()> {
     let user = format!(
         "@{}:{}",
         state.config.appservice.sender_localpart, state.config.matrix.server_name

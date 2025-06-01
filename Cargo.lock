@@ -313,6 +313,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "commune"
+version = "0.1.1"
+dependencies = [
+ "anyhow",
+ "axum",
+ "clap",
+ "http",
+ "hyper-util",
+ "once_cell",
+ "redis",
+ "regex",
+ "reqwest",
+ "ruma",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "toml",
+ "tower",
+ "tower-http",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+ "xdg",
+]
+
+[[package]]
 name = "const_panic"
 version = "0.2.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1138,32 +1165,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f139b0662de085916d1fb67d2b4169d1addddda1919e696f3252b740b629986e"
 dependencies = [
  "unicode-ident",
-]
-
-[[package]]
-name = "public-appservice"
-version = "0.1.1"
-dependencies = [
- "anyhow",
- "axum",
- "clap",
- "http",
- "hyper-util",
- "once_cell",
- "redis",
- "regex",
- "reqwest",
- "ruma",
- "serde",
- "serde_json",
- "thiserror",
- "tokio",
- "toml",
- "tower",
- "tower-http",
- "tracing",
- "tracing-subscriber",
- "uuid",
 ]
 
 [[package]]
@@ -2393,6 +2394,12 @@ name = "writeable"
 version = "0.5.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1e9df38ee2d2c3c5948ea468a8406ff0db0b29ae1ffde1bcf20ef305bcc95c51"
+
+[[package]]
+name = "xdg"
+version = "3.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2fb433233f2df9344722454bc7e96465c9d03bff9d77c248f9e7523fe79585b5"
 
 [[package]]
 name = "yoke"

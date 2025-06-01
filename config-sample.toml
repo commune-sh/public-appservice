@@ -38,3 +38,6 @@ expire_after = 3600
 [public_rooms]
 curated = false
 include_rooms = []
+
+[tracing]
+filter = "debug,hyper_util=off,tower_http=off,ruma=off,reqwest=off"

@@ -1,42 +1,12 @@
-use config::Config;
-use public_appservice::*;
-use server::Server;
+use std::process::ExitCode;
 
-use tracing::info;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-
-use crate::AppState;
+use commune::args;
 
 #[tokio::main]
-async fn main() {
-    setup_tracing();
-
-    let args = Args::build();
-
-    let config = Config::new(&args.config);
-
-    let state = AppState::new(config.clone()).await.unwrap_or_else(|e| {
-        eprintln!("Failed to initialize state: {}", e);
-        std::process::exit(1);
-    });
-
-    info!("Starting Commune public appservice...");
-
-    Server::new(state).run().await.unwrap_or_else(|e| {
-        eprintln!("Server error: {}", e);
-        std::process::exit(1);
-    });
-}
-
-pub fn setup_tracing() {
-    let env_filter = if cfg!(debug_assertions) {
-        "debug,hyper_util=off,tower_http=off,ruma=off,reqwest=off"
-    } else {
-        "info"
+pub async fn main() -> ExitCode {
+    let Err(_error) = args::Args::run().await else {
+        return ExitCode::SUCCESS;
     };
 
-    tracing_subscriber::registry()
-        .with(tracing_subscriber::fmt::layer())
-        .with(tracing_subscriber::EnvFilter::new(env_filter))
-        .init();
+    ExitCode::FAILURE
 }
