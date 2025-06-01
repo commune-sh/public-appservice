@@ -1,10 +1,9 @@
-use std::{path::PathBuf, process::ExitCode};
+use std::path::PathBuf;
 
 use clap::Parser;
 
-use crate::{config::Config, logging, server::Server, Application};
+use crate::{config::Config, error::startup::Main as Error, logging, server::Server, Application};
 
-/// Command line arguments
 #[derive(Parser)]
 #[clap(
     about,
@@ -12,7 +11,7 @@ use crate::{config::Config, logging, server::Server, Application};
 )]
 pub struct Args {
     #[clap(flatten)]
-    pub(crate) config: ConfigArg,
+    pub config: ConfigArg,
 }
 
 #[derive(Parser)]
@@ -22,25 +21,19 @@ pub struct ConfigArg {
 }
 
 impl Args {
-    pub async fn run() -> Result<(), ExitCode> {
-        let args = Args::parse();
+    pub async fn run() -> Result<(), Error> {
+        let args = Args::try_parse()?;
 
-        let config = Config::new(args.config.path)?;
+        let config = Config::new(args.config.path).map_err(Error::Config)?;
 
         logging::init(&config.tracing.filter)?;
 
-        let state = Application::new(config).await.map_err(|error| {
-            eprintln!("Failed to initialize state: {error}");
-
-            ExitCode::FAILURE
-        })?;
+        let state = Application::new(config).await?;
 
         tracing::info!("Starting Commune public appservice...");
 
-        Server::new(state).run().await.map_err(|error| {
-            eprintln!("Failed to start server: {error}");
+        Server::new(state).run().await?;
 
-            ExitCode::FAILURE
-        })
+        Ok(())
     }
 }

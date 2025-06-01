@@ -1,6 +1,8 @@
 use crate::constants::DEFAULT_CONFIG_PATH;
 use serde::{Deserialize, Serialize};
-use std::{fs, path::PathBuf, process::ExitCode};
+use std::{fs, path::PathBuf};
+
+use crate::error::startup::Config as Error;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
@@ -95,32 +97,19 @@ pub struct PublicRooms {
 }
 
 impl Config {
-    pub fn new(path: Option<PathBuf>) -> Result<Self, ExitCode> {
+    pub fn new(path: Option<PathBuf>) -> Result<Self, Error> {
         let path = path.map(Ok).unwrap_or_else(Self::search)?;
 
-        let content = fs::read_to_string(path).map_err(|error| {
-            eprintln!("Failed to read config: {error}",);
+        let content =
+            fs::read_to_string(path.clone()).map_err(|error| Error::Read(error, path.clone()))?;
 
-            ExitCode::FAILURE
-        })?;
-
-        toml::from_str(&content).map_err(|error| {
-            eprintln!("Failed to parse config: {error}",);
-
-            ExitCode::FAILURE
-        })
+        toml::from_str(&content).map_err(|error| Error::Parse(error, path))
     }
 
-    fn search() -> Result<PathBuf, ExitCode> {
+    fn search() -> Result<PathBuf, Error> {
         let dirs = xdg::BaseDirectories::new();
 
-        dirs.find_config_file(&*DEFAULT_CONFIG_PATH).ok_or_else(|| {
-            eprintln!(
-                "Failed to find config at path: {}",
-                DEFAULT_CONFIG_PATH.display()
-            );
-
-            ExitCode::FAILURE
-        })
+        dirs.find_config_file(&*DEFAULT_CONFIG_PATH)
+            .ok_or_else(|| Error::Search(DEFAULT_CONFIG_PATH.to_owned()))
     }
 }

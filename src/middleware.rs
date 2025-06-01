@@ -15,7 +15,7 @@ use std::sync::Arc;
 
 use crate::{utils::room_id_valid, Application};
 
-use crate::error::AppserviceError;
+use crate::error::serve::Main as Error;
 
 pub fn extract_token(header: &str) -> Option<&str> {
     header.strip_prefix("Bearer ").map(|token| token.trim())
@@ -162,25 +162,23 @@ pub async fn validate_public_room(
     State(state): State<Arc<Application>>,
     req: Request<Body>,
     next: Next,
-) -> Result<impl IntoResponse, AppserviceError> {
+) -> Result<impl IntoResponse, Error> {
     let room_id = data
         .room_id
         .as_ref()
-        .ok_or(AppserviceError::AppserviceError(
-            "No room ID found".to_string(),
-        ))?;
+        .ok_or(Error::Appservice("No room ID found".to_string()))?;
 
-    let id = RoomId::parse(room_id)
-        .map_err(|_| AppserviceError::AppserviceError("Invalid room ID".to_string()))?;
+    let id =
+        RoomId::parse(room_id).map_err(|_| Error::Appservice("Invalid room ID".to_string()))?;
 
-    let joined = state.appservice.has_joined_room(id).await.map_err(|_| {
-        AppserviceError::AppserviceError("Failed to check room membership".to_string())
-    })?;
+    let joined = state
+        .appservice
+        .has_joined_room(id)
+        .await
+        .map_err(|_| Error::Appservice("Failed to check room membership".to_string()))?;
 
     if !joined {
-        return Err(AppserviceError::AppserviceError(
-            "User is not in room".to_string(),
-        ));
+        return Err(Error::Appservice("User is not in room".to_string()));
     }
 
     Ok(next.run(req).await)
@@ -189,20 +187,20 @@ pub async fn validate_public_room(
 pub async fn is_public_room(
     Extension(data): Extension<Data>,
     State(state): State<Arc<Application>>,
-) -> Result<impl IntoResponse, AppserviceError> {
+) -> Result<impl IntoResponse, Error> {
     let room_id = data
         .room_id
         .as_ref()
-        .ok_or(AppserviceError::AppserviceError(
-            "No room ID found".to_string(),
-        ))?;
+        .ok_or(Error::Appservice("No room ID found".to_string()))?;
 
-    let id = RoomId::parse(room_id)
-        .map_err(|_| AppserviceError::AppserviceError("Invalid room ID".to_string()))?;
+    let id =
+        RoomId::parse(room_id).map_err(|_| Error::Appservice("Invalid room ID".to_string()))?;
 
-    let joined = state.appservice.has_joined_room(id).await.map_err(|_| {
-        AppserviceError::AppserviceError("Failed to check room membership".to_string())
-    })?;
+    let joined = state
+        .appservice
+        .has_joined_room(id)
+        .await
+        .map_err(|_| Error::Appservice("Failed to check room membership".to_string()))?;
 
     if joined {
         return Ok((
