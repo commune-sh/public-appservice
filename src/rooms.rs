@@ -50,7 +50,7 @@ pub async fn public_rooms(
             .cache
             .get_multiplexed_async_connection()
             .await
-            .map_err(|_| Error::Matrix("Failed to fetch rooms".to_string()))?;
+            .map_err(|_| Error::Matrix("Failed to fetch rooms"))?;
 
         if let Ok(cached_data) = get_cached_rooms(&mut redis_conn).await {
             info!("Public rooms fetched from cache");
@@ -66,7 +66,7 @@ pub async fn public_rooms(
     let rooms = match state.appservice.joined_rooms_state().await {
         Ok(Some(rooms)) => rooms,
         Ok(None) | Err(_) => {
-            return Err(Error::Matrix("Failed to fetch rooms".to_string()));
+            return Err(Error::Matrix("Failed to fetch rooms"));
         }
     };
 
@@ -369,13 +369,13 @@ pub async fn room_info(
     println!("query: {:#?}", query);
 
     let mut parsed_id =
-        RoomId::parse(&room_id).map_err(|_| Error::Matrix("Invalid room ID".to_string()))?;
+        RoomId::parse(&room_id).map_err(|_| Error::Matrix("Invalid room ID"))?;
 
     let summary = state
         .appservice
         .get_room_summary(parsed_id.clone())
         .await
-        .map_err(|_| Error::Matrix("Room not found".to_string()))?;
+        .map_err(|_| Error::Matrix("Room not found"))?;
 
     let mut info = RoomInfo {
         info: summary,
@@ -389,7 +389,7 @@ pub async fn room_info(
             .appservice
             .get_room_hierarchy(parsed_id.clone())
             .await
-            .map_err(|_| Error::Matrix("Failed to fetch room hierarchy".to_string()))?;
+            .map_err(|_| Error::Matrix("Failed to fetch room hierarchy"))?;
 
         for room in hierarchy {
             if let Some(name) = room.name.as_ref() {
@@ -402,7 +402,7 @@ pub async fn room_info(
                         .appservice
                         .get_room_summary(parsed_id.clone())
                         .await
-                        .map_err(|_| Error::Matrix("Room not found".to_string()))?;
+                        .map_err(|_| Error::Matrix("Room not found"))?;
 
                     info.room = Some(summary);
                     break;
@@ -413,13 +413,13 @@ pub async fn room_info(
 
     if let Some(event_id) = query.event {
         let parsed_event_id =
-            EventId::parse(&event_id).map_err(|_| Error::Matrix("Invalid event ID".to_string()))?;
+            EventId::parse(&event_id).map_err(|_| Error::Matrix("Invalid event ID"))?;
 
         let event = state
             .appservice
             .get_room_event(parsed_id, parsed_event_id)
             .await
-            .map_err(|_| Error::Matrix("Event not found".to_string()))?;
+            .map_err(|_| Error::Matrix("Event not found"))?;
 
         info.event = Some(event.clone());
 
@@ -430,7 +430,7 @@ pub async fn room_info(
                 .appservice
                 .get_profile(sender)
                 .await
-                .map_err(|_| Error::Matrix("Failed to fetch profile".to_string()))?;
+                .map_err(|_| Error::Matrix("Failed to fetch profile"))?;
 
             info.sender = Some(Sender {
                 avatar_url: profile.avatar_url,
@@ -449,7 +449,7 @@ pub async fn join_room(
     println!("Requested to join room: {}", room_id);
 
     let room_id =
-        RoomId::parse(&room_id).map_err(|_| Error::Matrix("Invalid room ID".to_string()))?;
+        RoomId::parse(&room_id).map_err(|_| Error::Matrix("Invalid room ID"))?;
 
     let _ = state.appservice.join_room(room_id).await;
 
@@ -468,7 +468,7 @@ pub async fn leave_room(
     println!("Requested to leave room: {}", room_id);
 
     let room_id =
-        RoomId::parse(&room_id).map_err(|_| Error::Matrix("Invalid room ID".to_string()))?;
+        RoomId::parse(&room_id).map_err(|_| Error::Matrix("Invalid room ID"))?;
 
     let _ = state.appservice.leave_room(room_id).await;
 

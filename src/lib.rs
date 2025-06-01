@@ -33,7 +33,7 @@ pub struct Application {
     pub config: config::Config,
     pub proxy: ProxyClient,
     pub appservice: appservice::AppService,
-    pub transaction_store: ping::TransactionStore,
+    pub txn_store: ping::TxnStore,
     pub cache: redis::Client,
     pub oidc: oidc::AuthMetadata,
 }
@@ -48,7 +48,7 @@ impl Application {
 
         let cache = cache::Cache::new(&config).await?;
 
-        let transaction_store = ping::TransactionStore::new();
+        let txn_store = ping::TxnStore::new();
 
         let oidc = oidc::get_auth_metadata(&config.matrix.homeserver).await?;
 
@@ -58,7 +58,7 @@ impl Application {
             config,
             proxy: client,
             appservice,
-            transaction_store,
+            txn_store,
             cache: cache.client,
             oidc,
         }))

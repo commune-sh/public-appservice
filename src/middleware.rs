@@ -166,19 +166,19 @@ pub async fn validate_public_room(
     let room_id = data
         .room_id
         .as_ref()
-        .ok_or(Error::Appservice("No room ID found".to_string()))?;
+        .ok_or(Error::Appservice("No room ID found"))?;
 
     let id =
-        RoomId::parse(room_id).map_err(|_| Error::Appservice("Invalid room ID".to_string()))?;
+        RoomId::parse(room_id).map_err(|_| Error::Appservice("Invalid room ID"))?;
 
     let joined = state
         .appservice
         .has_joined_room(id)
         .await
-        .map_err(|_| Error::Appservice("Failed to check room membership".to_string()))?;
+        .map_err(|_| Error::Appservice("Failed to check room membership"))?;
 
     if !joined {
-        return Err(Error::Appservice("User is not in room".to_string()));
+        return Err(Error::Appservice("User is not in room"));
     }
 
     Ok(next.run(req).await)
@@ -191,16 +191,16 @@ pub async fn is_public_room(
     let room_id = data
         .room_id
         .as_ref()
-        .ok_or(Error::Appservice("No room ID found".to_string()))?;
+        .ok_or(Error::Appservice("No room ID found"))?;
 
     let id =
-        RoomId::parse(room_id).map_err(|_| Error::Appservice("Invalid room ID".to_string()))?;
+        RoomId::parse(room_id).map_err(|_| Error::Appservice("Invalid room ID"))?;
 
     let joined = state
         .appservice
         .has_joined_room(id)
         .await
-        .map_err(|_| Error::Appservice("Failed to check room membership".to_string()))?;
+        .map_err(|_| Error::Appservice("Failed to check room membership"))?;
 
     if joined {
         return Ok((

@@ -3,171 +3,24 @@ use axum::{
     extract::{OriginalUri, State},
     http::{header::AUTHORIZATION, HeaderValue, Request, Response, StatusCode, Uri},
     response::IntoResponse,
-    Extension, Json,
+    Extension,
 };
 
-use ruma::events::room::{
-    history_visibility::{HistoryVisibility, RoomHistoryVisibilityEvent},
-    member::{MembershipState, RoomMemberEvent},
-};
 
 use ruma::events::macros::EventContent;
 
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
 use std::sync::Arc;
-use tracing::info;
 
 use crate::{middleware::Data, Application};
+
+pub mod ping;
+pub mod event;
 
 #[derive(Clone, Debug, Deserialize, Serialize, EventContent)]
 #[ruma_event(type = "commune.public.room", kind = State, state_key_type = String)]
 pub struct CommunePublicRoomEventContent {
     pub public: bool,
-}
-
-pub async fn transactions(
-    State(state): State<Arc<Application>>,
-    Json(payload): Json<Value>,
-) -> Result<Json<Value>, (StatusCode, String)> {
-    let events = match payload.get("events") {
-        Some(Value::Array(events)) => events,
-        Some(_) | None => {
-            println!("Events is not an array");
-            return Ok(Json(json!({})));
-        }
-    };
-
-    for event in events {
-        if cfg!(debug_assertions) {
-            println!("Event: {:#?}", event);
-        }
-
-        // If auto-join is enabled, join rooms with world_readable history visibility
-        if state.config.appservice.rules.auto_join {
-            if let Ok(event) = serde_json::from_value::<RoomHistoryVisibilityEvent>(event.clone()) {
-                if event.history_visibility() == &HistoryVisibility::WorldReadable {
-                    println!("History Visibility: World Readable");
-
-                    let room_id = event.room_id().to_owned();
-                    info!("Joining room: {}", room_id);
-                    let _ = state.appservice.join_room(room_id).await;
-
-                    return Ok(Json(json!({})));
-                }
-            }
-        };
-
-        // Match commune.room.public types
-
-        /*
-        let room_id = event["room_id"].as_str();
-        let event_type = event["type"].as_str();
-        let public = event["content"]["public"].as_bool();
-
-        match room_id {
-            Some(room_id) => {
-                println!("Room ID: {}", room_id);
-                let room_id = RoomId::parse(room_id);
-                 match (event_type, public) {
-                    (Some("commune.room.public"), Some(true)) => {
-                        info!("Joining room: {}", room_id);
-                        let _ = state.appservice.join_room(room_id).await;
-                    },
-                    (Some("commune.room.public"), Some(false)) => {
-                        println!("Leave room");
-
-                    }
-                    _ => {}
-                }
-            }
-            None => {}
-        }
-        */
-
-        let public = event["content"]["public"].as_bool();
-        if let Ok(event) = serde_json::from_value::<CommunePublicRoomEvent>(event.clone()) {
-            tracing::info!("Commune Public room event.");
-            let room_id = event.room_id().to_owned();
-            match public {
-                Some(true) => {
-                    info!("Joining room: {}", room_id);
-                    let _ = state.appservice.join_room(room_id).await;
-                }
-                Some(false) => {
-                    info!("Leaving room: {}", room_id);
-                    let _ = state.appservice.leave_room(room_id).await;
-                }
-                None => {}
-            }
-        };
-
-        let member_event =
-            if let Ok(event) = serde_json::from_value::<RoomMemberEvent>(event.clone()) {
-                event
-            } else {
-                continue;
-            };
-
-        print!("Member Event: {:#?}", member_event);
-
-        let room_id = member_event.room_id().to_owned();
-        let membership = member_event.membership().to_owned();
-        let server_name = member_event.room_id().server_name();
-
-        match server_name {
-            Some(server_name) => {
-                let allowed = state
-                    .config
-                    .appservice
-                    .rules
-                    .federation_domain_whitelist
-                    .iter()
-                    .any(|domain| server_name.as_str().ends_with(domain));
-
-                if server_name.as_str() != state.config.matrix.server_name && allowed {
-                    // Ignore events for rooms on other servers, if configured to local homeserver
-                    // users
-                    if state.config.appservice.rules.invite_by_local_user {
-                        info!(
-                            "Ignoring event for room on different server: {}",
-                            server_name
-                        );
-                        continue;
-                    }
-                }
-            }
-            None => {
-                info!("Ignoring event for room with no server name");
-                continue;
-            }
-        }
-
-        // Ignore membership events for other users
-        let invited_user = member_event.state_key().to_owned();
-        if invited_user != state.appservice.user_id() {
-            info!("Ignoring event for user: {}", invited_user);
-            continue;
-        }
-
-        match membership {
-            MembershipState::Invite => {
-                info!("Joining room: {}", room_id);
-                let _ = state.appservice.join_room(room_id).await;
-            }
-            MembershipState::Leave => {
-                let _ = state.appservice.leave_room(room_id).await;
-            }
-            MembershipState::Ban => {
-                info!("Banned from room: {}", room_id);
-                let _ = state.appservice.leave_room(room_id).await;
-                //state.appservice.leave_room(room_id).await;
-            }
-            _ => {}
-        }
-    }
-
-    Ok(Json(json!({})))
 }
 
 pub async fn matrix_proxy(

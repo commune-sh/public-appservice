@@ -7,19 +7,21 @@ use axum::{
     Json,
 };
 
+pub type Result<T> = core::result::Result<T, Main>;
+
 #[derive(Error, Debug)]
 pub enum Main {
     #[error("Appservice error: {0}")]
-    Appservice(String),
+    Appservice(&'static str),
 
     #[error("Homeserver unreachable: {0}")]
-    Homeserver(String),
+    Homeserver(&'static str),
 
     #[error("Matrix API error: {0}")]
-    Matrix(String),
+    Matrix(&'static str),
 
     #[error("Event not found: {0}")]
-    EventNotFound(String),
+    EventNotFound(&'static str),
 
     #[error("M_FORBIDDEN")]
     IncorrectHSToken,

@@ -19,7 +19,6 @@ pub struct Incoming<T>(pub T);
 impl<T, S> FromRequest<S> for Incoming<T>
 where
     T: IncomingRequest,
-    S: Send + Sync,
 {
     type Rejection = ();
 
@@ -43,8 +42,7 @@ where
     }
 }
 
-#[allow(dead_code)]
-trait RouterExt<S> {
+pub trait RouterExt<S> {
     fn ruma_route<H, T>(self, handler: H) -> Self
     where
         H: Handler<T, S>,
@@ -61,55 +59,65 @@ impl<S> RouterExt<S> for Router<S> {
     }
 }
 
-#[allow(dead_code)]
 pub trait Handler<T, S> {
     fn add_to_router(self, router: Router<S>) -> Router<S>;
 }
 
-macro_rules! def_method_to_filter {
-    ($($variant:ident),* $(,)?) => {
-        fn method_to_filter(method: Method) -> MethodFilter {
-            match method {
-                $(Method::$variant => MethodFilter::$variant,)*
-                m => panic!("Unsupported HTTP method: {m:?}"),
+macro_rules! impl_ruma_handler {
+    ( $($ty:ident),* $(,)? ) => {
+        #[allow(non_snake_case)]
+        #[async_trait]
+        impl<Req, Res, E, H, F, S, $( $ty, )*> Handler<($($ty,)* Incoming<Req>,), S> for H
+        where
+            Req: IncomingRequest + Send + 'static,
+            Res: OutgoingResponse,
+            E: IntoResponse,
+            H: FnOnce($($ty,)* Req) -> F + Clone + Send + 'static,
+            F: Future<Output = Result<Res, E>> + Send,
+            S: Clone + Send + Sync + 'static,
+            $( $ty: FromRequestParts<S> + Send + 'static, )*
+        {
+            fn add_to_router(self, router: Router<S>) -> Router<S> {
+                let Metadata {
+                    method, history, ..
+                } = Req::METADATA;
+
+                let method = match method {
+                    Method::DELETE => MethodFilter::DELETE,
+                    Method::GET => MethodFilter::GET,
+                    Method::HEAD => MethodFilter::HEAD,
+                    Method::OPTIONS => MethodFilter::OPTIONS,
+                    Method::PATCH => MethodFilter::PATCH,
+                    Method::POST => MethodFilter::POST,
+                    Method::PUT => MethodFilter::PUT,
+                    Method::TRACE => MethodFilter::TRACE,
+                    m => panic!("Unsupported HTTP method: {m:?}"),
+                };
+
+                history.all_paths().fold(router, |router, path| {
+                    let f = self.clone();
+
+                    router.route(
+                        path,
+                        on(method, |$( $ty: $ty, )* req: Incoming<Req>| async move {
+                            match f($( $ty, )* req.0).await {
+                                Ok(res) => Outgoing(res).into_response(),
+                                Err(error) => error.into_response(),
+                            }
+                        }),
+                    )
+                })
             }
         }
     };
 }
 
-def_method_to_filter!(DELETE, GET, HEAD, OPTIONS, PATCH, POST, PUT, TRACE);
-
-#[allow(non_snake_case)]
-#[async_trait]
-impl<Req, Res, E, H, F, S, T1> Handler<(T1, Req), S> for H
-where
-    Req: IncomingRequest + Send + 'static,
-    Res: OutgoingResponse,
-    E: IntoResponse,
-    H: FnOnce(T1, Req) -> F + Clone + Send + 'static,
-    F: Future<Output = Result<Res, E>> + Send,
-    S: Clone + Send + Sync + 'static,
-    T1: FromRequestParts<S> + Send + 'static,
-{
-    fn add_to_router(self, router: Router<S>) -> Router<S> {
-        let Metadata {
-            method, history, ..
-        } = Req::METADATA;
-
-        let filter = method_to_filter(method);
-
-        history.all_paths().fold(router, |router, path| {
-            let f = self.clone();
-
-            router.route(
-                path,
-                on(filter, |t1: T1, Incoming(req): Incoming<Req>| async move {
-                    match f(t1, req).await {
-                        Ok(res) => Outgoing(res).into_response(),
-                        Err(_) => todo!(),
-                    }
-                }),
-            )
-        })
-    }
-}
+impl_ruma_handler!();
+impl_ruma_handler!(T1);
+impl_ruma_handler!(T1, T2);
+impl_ruma_handler!(T1, T2, T3);
+impl_ruma_handler!(T1, T2, T3, T4);
+impl_ruma_handler!(T1, T2, T3, T4, T5);
+impl_ruma_handler!(T1, T2, T3, T4, T5, T6);
+impl_ruma_handler!(T1, T2, T3, T4, T5, T6, T7);
+impl_ruma_handler!(T1, T2, T3, T4, T5, T6, T7, T8);
