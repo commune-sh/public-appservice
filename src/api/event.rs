@@ -7,15 +7,12 @@ use ruma::{
         room::{
             history_visibility::HistoryVisibility,
             member::{MembershipState, RoomMemberEvent},
-        }, AnyStateEvent,
+        },
+        AnyStateEvent,
     },
 };
 
-use crate::{
-    api::OriginalCommunePublicRoomEvent,
-    error::serve::Result,
-    Application,
-};
+use crate::{api::OriginalCommunePublicRoomEvent, error::serve::Result, Application};
 
 pub async fn push_events_route(
     State(app): State<Arc<Application>>,

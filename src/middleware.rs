@@ -1,12 +1,16 @@
 use axum::{
     body::Body,
     extract::{MatchedPath, OriginalUri, Path, State},
-    http::{header::AUTHORIZATION, Request, StatusCode, Uri},
+    http::{Request, StatusCode, Uri},
     middleware::Next,
     response::IntoResponse,
-    Extension, Json,
+    Extension, Json, RequestPartsExt,
 };
 
+use axum_extra::{
+    headers::{authorization::Bearer, Authorization},
+    TypedHeader,
+};
 use ruma::{RoomAliasId, RoomId};
 
 use serde_json::{json, Value};
@@ -17,35 +21,25 @@ use crate::{utils::room_id_valid, Application};
 
 use crate::error::serve::Main as Error;
 
-pub fn extract_token(header: &str) -> Option<&str> {
-    header.strip_prefix("Bearer ").map(|token| token.trim())
-}
+async fn extract_bearer_token(req: Request<Body>) -> (String, Request<Body>) {
+    let (mut parts, body) = req.into_parts();
 
-fn unauthorized_error() -> (StatusCode, Json<Value>) {
-    (
-        StatusCode::UNAUTHORIZED,
-        Json(json!({
-            "errcode": "M_FORBIDDEN",
-        })),
-    )
+    let auth_header: Option<TypedHeader<Authorization<Bearer>>> = parts.extract().await.unwrap();
+
+    let token = auth_header.map(|bearer| bearer.token().to_owned()).unwrap();
+
+    (token, http::Request::from_parts(parts, body))
 }
 
 pub async fn authenticate_homeserver(
-    State(state): State<Arc<Application>>,
+    State(app): State<Arc<Application>>,
     req: Request<Body>,
     next: Next,
-) -> Result<impl IntoResponse, (StatusCode, Json<Value>)> {
-    let token = req
-        .headers()
-        .get(AUTHORIZATION)
-        .ok_or(unauthorized_error())?
-        .to_str()
-        .map_err(|_| unauthorized_error())?;
+) -> Result<axum::response::Response, ()> {
+    let (token, req) = extract_bearer_token(req).await;
 
-    let token = extract_token(token).ok_or(unauthorized_error())?;
-
-    if token != state.config.appservice.hs_access_token {
-        return Err(unauthorized_error());
+    if token != app.config.appservice.hs_access_token {
+        panic!()
     }
 
     Ok(next.run(req).await)
@@ -55,18 +49,11 @@ pub async fn is_admin(
     //State(state): State<Arc<Application>>,
     req: Request<Body>,
     next: Next,
-) -> Result<impl IntoResponse, (StatusCode, Json<Value>)> {
-    let token = req
-        .headers()
-        .get(AUTHORIZATION)
-        .ok_or(unauthorized_error())?
-        .to_str()
-        .map_err(|_| unauthorized_error())?;
-
-    let token = extract_token(token).ok_or(unauthorized_error())?;
+) -> Result<axum::response::Response, ()> {
+    let (token, req) = extract_bearer_token(req).await;
 
     if token != "test" {
-        return Err(unauthorized_error());
+        panic!()
     }
 
     Ok(next.run(req).await)
@@ -168,8 +155,7 @@ pub async fn validate_public_room(
         .as_ref()
         .ok_or(Error::Appservice("No room ID found"))?;
 
-    let id =
-        RoomId::parse(room_id).map_err(|_| Error::Appservice("Invalid room ID"))?;
+    let id = RoomId::parse(room_id).map_err(|_| Error::Appservice("Invalid room ID"))?;
 
     let joined = state
         .appservice
@@ -193,8 +179,7 @@ pub async fn is_public_room(
         .as_ref()
         .ok_or(Error::Appservice("No room ID found"))?;
 
-    let id =
-        RoomId::parse(room_id).map_err(|_| Error::Appservice("Invalid room ID"))?;
+    let id = RoomId::parse(room_id).map_err(|_| Error::Appservice("Invalid room ID"))?;
 
     let joined = state
         .appservice

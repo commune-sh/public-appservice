@@ -6,7 +6,6 @@ use axum::{
     Extension,
 };
 
-
 use ruma::events::macros::EventContent;
 
 use serde::{Deserialize, Serialize};
@@ -14,8 +13,8 @@ use std::sync::Arc;
 
 use crate::{middleware::Data, Application};
 
-pub mod ping;
 pub mod event;
+pub mod ping;
 
 #[derive(Clone, Debug, Deserialize, Serialize, EventContent)]
 #[ruma_event(type = "commune.public.room", kind = State, state_key_type = String)]

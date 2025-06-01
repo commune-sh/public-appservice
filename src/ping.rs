@@ -3,7 +3,6 @@ use ruma::{OwnedTransactionId, TransactionId};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-
 #[derive(Debug, Clone)]
 pub struct TxnStore {
     current_id: Arc<RwLock<Option<OwnedTransactionId>>>,
@@ -33,7 +32,7 @@ impl TxnStore {
     pub async fn verify_txn_id(&self, txn_id: &TransactionId) -> bool {
         let mut current_id = self.current_id.write().await;
 
-        if current_id.as_ref().filter(|id| &**id == txn_id).is_some() {
+        if current_id.as_ref().filter(|id| **id == txn_id).is_some() {
             *current_id = None;
 
             true

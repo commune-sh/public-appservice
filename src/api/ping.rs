@@ -13,7 +13,7 @@ pub async fn send_ping_route(
         unimplemented!();
     };
 
-    if !app.txn_store.verify_txn_id(&**txn_id).await {
+    if !app.txn_store.verify_txn_id(txn_id).await {
         println!("Transaction ID does not match: {txn_id}");
     }
 

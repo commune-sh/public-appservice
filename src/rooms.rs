@@ -368,8 +368,7 @@ pub async fn room_info(
 
     println!("query: {:#?}", query);
 
-    let mut parsed_id =
-        RoomId::parse(&room_id).map_err(|_| Error::Matrix("Invalid room ID"))?;
+    let mut parsed_id = RoomId::parse(&room_id).map_err(|_| Error::Matrix("Invalid room ID"))?;
 
     let summary = state
         .appservice
@@ -448,8 +447,7 @@ pub async fn join_room(
 ) -> Result<impl IntoResponse, Error> {
     println!("Requested to join room: {}", room_id);
 
-    let room_id =
-        RoomId::parse(&room_id).map_err(|_| Error::Matrix("Invalid room ID"))?;
+    let room_id = RoomId::parse(&room_id).map_err(|_| Error::Matrix("Invalid room ID"))?;
 
     let _ = state.appservice.join_room(room_id).await;
 
@@ -467,8 +465,7 @@ pub async fn leave_room(
 ) -> Result<impl IntoResponse, Error> {
     println!("Requested to leave room: {}", room_id);
 
-    let room_id =
-        RoomId::parse(&room_id).map_err(|_| Error::Matrix("Invalid room ID"))?;
+    let room_id = RoomId::parse(&room_id).map_err(|_| Error::Matrix("Invalid room ID"))?;
 
     let _ = state.appservice.leave_room(room_id).await;
 
