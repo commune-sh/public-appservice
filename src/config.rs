@@ -1,5 +1,6 @@
+use crate::constants::DEFAULT_CONFIG_PATH;
 use serde::{Deserialize, Serialize};
-use std::{fs, path::Path, process};
+use std::{fs, path::PathBuf, process::ExitCode};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
@@ -9,12 +10,18 @@ pub struct Config {
     pub redis: Redis,
     pub cache: Cache,
     pub public_rooms: PublicRooms,
+    pub tracing: Tracing,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Server {
     pub port: u16,
     pub allow_origin: Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Tracing {
+    pub filter: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -88,23 +95,32 @@ pub struct PublicRooms {
 }
 
 impl Config {
-    pub fn new(path: impl AsRef<Path>) -> Self {
-        let path = path.as_ref();
+    pub fn new(path: Option<PathBuf>) -> Result<Self, ExitCode> {
+        let path = path.map(Ok).unwrap_or_else(Self::search)?;
 
-        let config_content = match fs::read_to_string(path) {
-            Ok(content) => content,
-            Err(e) => {
-                eprintln!("Failed to read config.toml: {}", e);
-                process::exit(1);
-            }
-        };
+        let content = fs::read_to_string(path).map_err(|error| {
+            eprintln!("Failed to read config: {error}",);
 
-        match toml::from_str(&config_content) {
-            Ok(config) => config,
-            Err(e) => {
-                eprintln!("Failed to parse config.toml: {}", e);
-                process::exit(1);
-            }
-        }
+            ExitCode::FAILURE
+        })?;
+
+        toml::from_str(&content).map_err(|error| {
+            eprintln!("Failed to parse config: {error}",);
+
+            ExitCode::FAILURE
+        })
+    }
+
+    fn search() -> Result<PathBuf, ExitCode> {
+        let dirs = xdg::BaseDirectories::new();
+
+        dirs.find_config_file(&*DEFAULT_CONFIG_PATH).ok_or_else(|| {
+            eprintln!(
+                "Failed to find config at path: {}",
+                DEFAULT_CONFIG_PATH.display()
+            );
+
+            ExitCode::FAILURE
+        })
     }
 }

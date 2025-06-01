@@ -13,7 +13,7 @@ use serde_json::{json, Value};
 
 use std::sync::Arc;
 
-use crate::{utils::room_id_valid, AppState};
+use crate::{utils::room_id_valid, Application};
 
 use crate::error::AppserviceError;
 
@@ -31,7 +31,7 @@ fn unauthorized_error() -> (StatusCode, Json<Value>) {
 }
 
 pub async fn authenticate_homeserver(
-    State(state): State<Arc<AppState>>,
+    State(state): State<Arc<Application>>,
     req: Request<Body>,
     next: Next,
 ) -> Result<impl IntoResponse, (StatusCode, Json<Value>)> {
@@ -52,7 +52,7 @@ pub async fn authenticate_homeserver(
 }
 
 pub async fn is_admin(
-    //State(state): State<Arc<AppState>>,
+    //State(state): State<Arc<Application>>,
     req: Request<Body>,
     next: Next,
 ) -> Result<impl IntoResponse, (StatusCode, Json<Value>)> {
@@ -80,7 +80,7 @@ pub struct Data {
 
 pub async fn validate_room_id(
     Path(params): Path<Vec<(String, String)>>,
-    State(state): State<Arc<AppState>>,
+    State(state): State<Arc<Application>>,
     mut req: Request<Body>,
     next: Next,
 ) -> Result<impl IntoResponse, (StatusCode, Json<Value>)> {
@@ -159,7 +159,7 @@ pub async fn validate_room_id(
 pub async fn validate_public_room(
     Extension(data): Extension<Data>,
     //Path(params): Path<Vec<(String, String)>>,
-    State(state): State<Arc<AppState>>,
+    State(state): State<Arc<Application>>,
     req: Request<Body>,
     next: Next,
 ) -> Result<impl IntoResponse, AppserviceError> {
@@ -188,7 +188,7 @@ pub async fn validate_public_room(
 
 pub async fn is_public_room(
     Extension(data): Extension<Data>,
-    State(state): State<Arc<AppState>>,
+    State(state): State<Arc<Application>>,
 ) -> Result<impl IntoResponse, AppserviceError> {
     let room_id = data
         .room_id

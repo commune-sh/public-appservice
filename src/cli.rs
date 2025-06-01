@@ -1,9 +1,20 @@
+use std::path::PathBuf;
+
 use clap::Parser;
 
+/// Command line arguments
 #[derive(Parser)]
+#[clap(
+    about,
+    version = crate::version(),
+)]
 pub struct Args {
-    #[arg(short, long, default_value = "config.toml")]
-    pub config: std::path::PathBuf,
-    #[arg(short, long, default_value = "8989")]
-    pub port: u16,
+    #[clap(flatten)]
+    pub(crate) config: ConfigArg,
+}
+
+#[derive(Parser)]
+pub struct ConfigArg {
+    #[arg(short, long)]
+    pub config: Option<PathBuf>,
 }

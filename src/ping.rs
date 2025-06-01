@@ -7,7 +7,7 @@ use uuid::Uuid;
 use serde::Deserialize;
 use serde_json::json;
 
-use crate::{error::AppserviceError, AppState};
+use crate::{error::AppserviceError, Application};
 
 #[derive(Debug, Clone)]
 pub struct TransactionStore {
@@ -52,7 +52,7 @@ pub struct PingRequest {
 }
 
 pub async fn ping(
-    State(state): State<Arc<AppState>>,
+    State(state): State<Arc<Application>>,
     Json(payload): Json<PingRequest>,
 ) -> Result<impl IntoResponse, AppserviceError> {
     let txn_id = payload.transaction_id.clone();

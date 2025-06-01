@@ -18,7 +18,7 @@ use serde_json::{json, Value};
 use std::sync::Arc;
 use tracing::info;
 
-use crate::{middleware::Data, AppState};
+use crate::{middleware::Data, Application};
 
 #[derive(Clone, Debug, Deserialize, Serialize, EventContent)]
 #[ruma_event(type = "commune.public.room", kind = State, state_key_type = String)]
@@ -27,7 +27,7 @@ pub struct CommunePublicRoomEventContent {
 }
 
 pub async fn transactions(
-    State(state): State<Arc<AppState>>,
+    State(state): State<Arc<Application>>,
     Json(payload): Json<Value>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let events = match payload.get("events") {
@@ -172,7 +172,7 @@ pub async fn transactions(
 
 pub async fn matrix_proxy(
     Extension(data): Extension<Data>,
-    State(state): State<Arc<AppState>>,
+    State(state): State<Arc<Application>>,
     mut req: Request<Body>,
 ) -> Result<Response<Body>, StatusCode> {
     let mut path = if let Some(path) = req.extensions().get::<OriginalUri>() {
@@ -220,7 +220,7 @@ pub async fn matrix_proxy(
 }
 
 pub async fn media_proxy(
-    State(state): State<Arc<AppState>>,
+    State(state): State<Arc<Application>>,
     mut req: Request<Body>,
 ) -> Result<Response<Body>, StatusCode> {
     let path = if let Some(path) = req.extensions().get::<OriginalUri>() {

@@ -36,13 +36,13 @@ use crate::ping::ping;
 use crate::api::{matrix_proxy, media_proxy, transactions};
 
 pub struct Server {
-    state: Arc<AppState>,
+    state: Arc<Application>,
 }
 
-pub use crate::AppState;
+pub use crate::Application;
 
 impl Server {
-    pub fn new(state: Arc<AppState>) -> Self {
+    pub fn new(state: Arc<Application>) -> Self {
         Self { state }
     }
 
@@ -202,7 +202,7 @@ pub async fn version() -> Result<impl IntoResponse, ()> {
     })))
 }
 
-pub async fn identity(State(state): State<Arc<AppState>>) -> Result<impl IntoResponse, ()> {
+pub async fn identity(State(state): State<Arc<Application>>) -> Result<impl IntoResponse, ()> {
     let user = format!(
         "@{}:{}",
         state.config.appservice.sender_localpart, state.config.matrix.server_name

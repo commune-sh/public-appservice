@@ -29,7 +29,7 @@ use std::sync::Arc;
 
 use crate::{
     appservice::{JoinedRoomState, RoomSummary},
-    AppState,
+    Application,
 };
 
 use crate::middleware::Data;
@@ -43,7 +43,7 @@ use crate::error::AppserviceError;
 use tracing::{info, warn};
 
 pub async fn public_rooms(
-    State(state): State<Arc<AppState>>,
+    State(state): State<Arc<Application>>,
 ) -> Result<impl IntoResponse, AppserviceError> {
     // read from cache if enabled
     if state.config.cache.public_rooms.enabled {
@@ -146,7 +146,7 @@ fn is_false(b: &bool) -> bool {
     !*b
 }
 
-fn process_rooms(_state: Arc<AppState>, rooms: Vec<JoinedRoomState>) -> Vec<PublicRoom> {
+fn process_rooms(_state: Arc<Application>, rooms: Vec<JoinedRoomState>) -> Vec<PublicRoom> {
     let mut public_rooms: Vec<PublicRoom> = Vec::new();
 
     for room in &rooms {
@@ -361,7 +361,7 @@ pub async fn room_info(
     Path(params): Path<Vec<(String, String)>>,
     Extension(data): Extension<Data>,
     Query(query): Query<RoomInfoParams>,
-    State(state): State<Arc<AppState>>,
+    State(state): State<Arc<Application>>,
 ) -> Result<impl IntoResponse, AppserviceError> {
     let mut room_id = params[0].1.clone();
 
@@ -447,7 +447,7 @@ pub async fn room_info(
 }
 
 pub async fn join_room(
-    State(state): State<Arc<AppState>>,
+    State(state): State<Arc<Application>>,
     Path(room_id): Path<String>,
 ) -> Result<impl IntoResponse, AppserviceError> {
     println!("Requested to join room: {}", room_id);
@@ -466,7 +466,7 @@ pub async fn join_room(
 }
 
 pub async fn leave_room(
-    State(state): State<Arc<AppState>>,
+    State(state): State<Arc<Application>>,
     Path(room_id): Path<String>,
 ) -> Result<impl IntoResponse, AppserviceError> {
     println!("Requested to leave room: {}", room_id);
