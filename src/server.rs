@@ -6,7 +6,6 @@ use axum::{
     routing::{get, post, put},
     Json, Router, ServiceExt,
 };
-
 use std::sync::Arc;
 use tracing::info;
 
@@ -34,6 +33,8 @@ use crate::{
 use crate::ping::ping;
 
 use crate::api::{matrix_proxy, media_proxy, transactions};
+
+mod ext;
 
 pub struct Server {
     state: Arc<Application>,
