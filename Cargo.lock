@@ -313,6 +313,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "commune"
+version = "0.1.1"
+dependencies = [
+ "anyhow",
+ "axum",
+ "clap",
+ "http",
+ "hyper-util",
+ "once_cell",
+ "redis",
+ "regex",
+ "reqwest",
+ "ruma",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "toml",
+ "tower",
+ "tower-http",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+ "xdg",
+]
+
+[[package]]
 name = "const_panic"
 version = "0.2.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1138,33 +1165,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f139b0662de085916d1fb67d2b4169d1addddda1919e696f3252b740b629986e"
 dependencies = [
  "unicode-ident",
-]
-
-[[package]]
-name = "public-appservice"
-version = "0.1.1"
-dependencies = [
- "anyhow",
- "axum",
- "clap",
- "http",
- "hyper-util",
- "once_cell",
- "redis",
- "regex",
- "reqwest",
- "ruma",
- "serde",
- "serde_json",
- "thiserror",
- "tokio",
- "toml",
- "tower",
- "tower-http",
- "tracing",
- "tracing-subscriber",
- "uuid",
- "xdg",
 ]
 
 [[package]]
