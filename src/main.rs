@@ -1,6 +1,6 @@
 use std::process::ExitCode;
 
-use public_appservice::args;
+use commune::args;
 
 #[tokio::main]
 pub async fn main() -> ExitCode {

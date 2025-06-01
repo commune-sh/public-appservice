@@ -1,5 +1,5 @@
 [package]
-name = "public-appservice"
+name = "commune"
 version = "0.1.1"
 description = "An appservice to make Matrix spaces publicly accessible."
 license = "AGPL-3.0"
