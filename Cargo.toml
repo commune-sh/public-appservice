@@ -11,6 +11,7 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.93"
 axum = "0.8.3"
+axum-extra = { version = "0.10.1", features = ["typed-header"] }
 clap = { version = "4.5.23", features = ["derive"] }
 http = "1.1.0"
 hyper-util = { version = "0.1.10", features = ["client", "client-legacy", "http2"] }
