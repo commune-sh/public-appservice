@@ -14,7 +14,10 @@ use std::sync::Arc;
 use axum::body::Body;
 use hyper_util::{client::legacy::connect::HttpConnector, rt::TokioExecutor};
 
-pub type ProxyClient = hyper_util::client::legacy::Client<HttpConnector, Body>;
+use hyper_tls::HttpsConnector;
+
+
+pub type ProxyClient = hyper_util::client::legacy::Client<HttpsConnector<HttpConnector>, Body>;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -28,9 +31,12 @@ pub struct AppState {
 
 impl AppState {
     pub async fn new(config: config::Config) -> Result<Arc<Self>, anyhow::Error> {
+
+        let https = HttpsConnector::new();
+
         let client: ProxyClient =
             hyper_util::client::legacy::Client::<(), ()>::builder(TokioExecutor::new())
-                .build(HttpConnector::new());
+                .build(https);
 
         let appservice = appservice::AppService::new(&config).await?;
 
