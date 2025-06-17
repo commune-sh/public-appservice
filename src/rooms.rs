@@ -44,11 +44,6 @@ use crate::middleware::Data;
 
 use crate::utils;
 
-use crate::cache::{
-    get_cached_rooms,
-    cache_rooms
-};
-
 use crate::error::AppserviceError;
 
 use tracing::{info, warn};
@@ -58,20 +53,15 @@ pub async fn public_rooms (
 ) -> Result<impl IntoResponse, AppserviceError> {
 
     // read from cache if enabled
-    if state.config.cache.public_rooms.enabled {
-        let mut redis_conn = state.cache.get_multiplexed_async_connection()
-            .await
-            .map_err(|_| AppserviceError::MatrixError("Failed to fetch rooms".to_string()))?;
 
-        if let Ok(cached_data) = get_cached_rooms(&mut redis_conn).await {
-            info!("Public rooms fetched from cache");
-            return Ok((
-                StatusCode::OK,
-                Json(json!({
-                    "rooms": json!(cached_data),
-                }))
-            ))
-        }
+    if let Ok(cached_data) = state.cache.get_cached_rooms().await {
+        info!("Public rooms fetched from cache");
+        return Ok((
+            StatusCode::OK,
+            Json(json!({
+                "rooms": json!(cached_data),
+            }))
+        ))
     }
 
     let rooms = match state.appservice.joined_rooms_state()
@@ -92,19 +82,13 @@ pub async fn public_rooms (
     // cache public rooms if enabled
     if state.config.cache.public_rooms.enabled {
         tokio::spawn(async move {
-            let mut redis_conn = state.cache.get_multiplexed_async_connection()
-                .await;
-
-            if let Ok(ref mut redis_conn) = redis_conn {
-                if let Err(e) = cache_rooms(
-                    redis_conn, 
-                    &to_cache,
-                    state.config.cache.public_rooms.expire_after
-                ).await {
-                    warn!("Failed to cache public rooms: {}", e);
-                } else {
-                    info!("Public rooms cached");
-                }
+            if let Err(e) = state.cache.cache_rooms(
+                &to_cache,
+                state.config.cache.public_rooms.expire_after
+            ).await {
+                warn!("Failed to cache public rooms: {}", e);
+            } else {
+                info!("Public rooms cached");
             }
         });
     }

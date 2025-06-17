@@ -7,6 +7,7 @@ use redis::{
 
 use crate::rooms::PublicRoom;
 
+#[derive(Debug, Clone)]
 pub struct Cache {
     pub client: redis::Client,
 }
@@ -16,6 +17,20 @@ impl Cache {
         let url = format!("redis://{}", config.redis.url);
         let client = redis::Client::open(url)?;
         Ok(Self { client })
+    }
+
+    pub async fn get_cached_rooms(&self) -> Result<Vec<PublicRoom>, RedisError> {
+        let mut conn = self.client.get_multiplexed_tokio_connection().await?;
+        get_cached_rooms(&mut conn).await
+    }
+
+    pub async fn cache_rooms(
+        &self,
+        rooms: &Vec<PublicRoom>,
+        ttl: u64,
+    ) -> Result<(), RedisError> {
+        let mut conn = self.client.get_multiplexed_tokio_connection().await?;
+        cache_rooms(&mut conn, rooms, ttl).await
     }
 }
 

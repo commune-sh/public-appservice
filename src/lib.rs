@@ -25,7 +25,7 @@ pub struct AppState {
     pub proxy: ProxyClient,
     pub appservice: appservice::AppService,
     pub transaction_store: ping::TransactionStore,
-    pub cache: redis::Client,
+    pub cache: cache::Cache,
     pub oidc: oidc::AuthMetadata,
 }
 
@@ -53,7 +53,7 @@ impl AppState {
             proxy: client,
             appservice,
             transaction_store,
-            cache: cache.client,
+            cache,
             oidc,
         }))
     }
