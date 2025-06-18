@@ -4,16 +4,14 @@ use axum::{
         Request, 
         Response, 
         StatusCode, 
-        Uri, 
-        HeaderValue, 
-        header::AUTHORIZATION
+        HeaderMap
     },
-    response::IntoResponse,
     body::Body,
     Json,
     Extension,
 };
 
+use std::time::Duration;
 use ruma::events::room::{
     member::{RoomMemberEvent, MembershipState},
     history_visibility::{RoomHistoryVisibilityEvent, HistoryVisibility},
@@ -180,86 +178,159 @@ pub async fn transactions(
     Ok(Json(json!({})))
 }
 
-
 pub async fn matrix_proxy(
     Extension(data): Extension<Data>,
     State(state): State<Arc<AppState>>,
-    mut req: Request<Body>,
+    req: Request<Body>,
 ) -> Result<Response<Body>, StatusCode> {
-
-    let mut path = if let Some(path) = req.extensions().get::<OriginalUri>() {
-        path.0.path()
+    let method = req.method().clone();
+    let headers = req.headers().clone();
+    
+    let path = if let Some(mod_path) = data.modified_path.as_ref() {
+        mod_path.as_str()
+    } else if let Some(original_uri) = req.extensions().get::<OriginalUri>() {
+        original_uri.0.path()
     } else {
         req.uri().path()
     };
 
-    if let Some(mod_path) = data.modified_path.as_ref() {
-        path = mod_path;
+    let mut target_url = format!("{}{}", state.config.matrix.homeserver, path);
+    
+    if data.modified_path.is_none() {
+        if let Some(query) = req.uri().query() {
+            target_url.push('?');
+            target_url.push_str(query);
+        }
     }
 
-    let path_query = req.uri().query().map(|q| format!("?{}", q)).unwrap_or_default();
-
-    let homeserver = &state.config.matrix.homeserver;
-
-    // add path query if path wasn't modified in middleware
-    let uri = if data.modified_path.is_some() {
-        format!("{}{}", homeserver, path)
-    } else {
-        format!("{}{}{}", homeserver, path, path_query)
+    let body_bytes = match axum::body::to_bytes(req.into_body(), usize::MAX).await {
+        Ok(bytes) => bytes,
+        Err(_) => {
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
     };
 
-    *req.uri_mut() = Uri::try_from(uri)
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let mut request_builder = state.proxy
+        .request(method, &target_url)
+        .timeout(Duration::from_secs(25)) // Slightly less than overall timeout
+        .bearer_auth(&state.config.appservice.access_token);
 
-    let access_token = &state.config.appservice.access_token;
+    let mut filtered_headers = HeaderMap::new();
+    for (name, value) in headers.iter() {
+        if !is_hop_by_hop_header(name.as_str()) && name != "authorization" {
+            filtered_headers.insert(name, value.clone());
+        }
+    }
 
-    let auth_value = HeaderValue::from_str(&format!("Bearer {}", access_token))
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    request_builder = request_builder.headers(filtered_headers);
 
-    req.headers_mut().insert(AUTHORIZATION, auth_value);
+    if !body_bytes.is_empty() {
+        request_builder = request_builder.body(body_bytes);
+    }
 
-    let response = state.proxy
-        .request(req)
+    let response = request_builder.send()
         .await
-        .map_err(|_| StatusCode::BAD_REQUEST)?
-        .into_response();
-        
+        .map_err(|_| StatusCode::BAD_REQUEST)?;
+
+    let status = response.status();
+    let headers = response.headers().clone();
+    let body = response.bytes()
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let mut axum_response = Response::builder().status(status);
+
+    for (name, value) in headers.iter() {
+        if !is_hop_by_hop_header(name.as_str()) {
+            axum_response = axum_response.header(name, value);
+        }
+    }
+
+    let response = axum_response
+        .body(axum::body::Body::from(body))
+        .map_err(|e| {
+            tracing::error!("Failed to build response: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
     Ok(response)
 }
 
 pub async fn media_proxy(
     State(state): State<Arc<AppState>>,
-    mut req: Request<Body>,
+    req: Request<Body>,
 ) -> Result<Response<Body>, StatusCode> {
 
-    let path = if let Some(path) = req.extensions().get::<OriginalUri>() {
-        path.0.path()
+    let method = req.method().clone();
+    let headers = req.headers().clone();
+    
+    let path = if let Some(original_uri) = req.extensions().get::<OriginalUri>() {
+        original_uri.0.path()
     } else {
         req.uri().path()
     };
 
-    let path_query = req.uri().query().map(|q| format!("?{}", q)).unwrap_or_default();
+    let query = req.uri().query().map(|q| format!("?{}", q)).unwrap_or_default();
 
-    let homeserver = &state.config.matrix.homeserver;
+    let target_url = format!("{}{}{}", state.config.matrix.homeserver, path, query);
+    
+    let body_bytes = match axum::body::to_bytes(req.into_body(), usize::MAX).await {
+        Ok(bytes) => bytes,
+        Err(_) => {
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    };
 
-    // add path query if path wasn't modified in middleware
-    let uri = format!("{}{}{}", homeserver, path, path_query);
+    let mut request_builder = state.proxy
+        .request(method, &target_url)
+        .timeout(Duration::from_secs(25)) 
+        .bearer_auth(&state.config.appservice.access_token);
 
-    *req.uri_mut() = Uri::try_from(uri)
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let mut filtered_headers = HeaderMap::new();
+    for (name, value) in headers.iter() {
+        if !is_hop_by_hop_header(name.as_str()) && name != "authorization" {
+            filtered_headers.insert(name, value.clone());
+        }
+    }
 
-    let access_token = &state.config.appservice.access_token;
+    request_builder = request_builder.headers(filtered_headers);
 
-    let auth_value = HeaderValue::from_str(&format!("Bearer {}", access_token))
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    if !body_bytes.is_empty() {
+        request_builder = request_builder.body(body_bytes);
+    }
 
-    req.headers_mut().insert(AUTHORIZATION, auth_value);
-
-    let response = state.proxy
-        .request(req)
+    let response = request_builder.send()
         .await
-        .map_err(|_| StatusCode::BAD_REQUEST)?
-        .into_response();
-        
+        .map_err(|_| StatusCode::BAD_REQUEST)?;
+
+    let status = response.status();
+    let headers = response.headers().clone();
+    let body = response.bytes()
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let mut axum_response = Response::builder().status(status);
+
+    for (name, value) in headers.iter() {
+        if !is_hop_by_hop_header(name.as_str()) {
+            axum_response = axum_response.header(name, value);
+        }
+    }
+
+    let response = axum_response
+        .body(axum::body::Body::from(body))
+        .map_err(|e| {
+            tracing::error!("Failed to build response: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
     Ok(response)
+}
+
+
+fn is_hop_by_hop_header(name: &str) -> bool {
+    matches!(name.to_lowercase().as_str(),
+        "connection" | "keep-alive" | "proxy-authenticate" | 
+        "proxy-authorization" | "te" | "trailers" | "transfer-encoding" | "upgrade"
+    )
 }

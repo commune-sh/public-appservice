@@ -12,13 +12,11 @@ pub mod utils;
 pub mod oidc;
 
 use std::sync::Arc;
-use axum::body::Body;
-use hyper_util::{client::legacy::connect::HttpConnector, rt::TokioExecutor};
+use std::time::Duration;
 
-use hyper_tls::HttpsConnector;
+use reqwest::Client;
 
-
-pub type ProxyClient = hyper_util::client::legacy::Client<HttpsConnector<HttpConnector>, Body>;
+pub type ProxyClient = reqwest::Client;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -34,11 +32,13 @@ pub struct AppState {
 impl AppState {
     pub async fn new(config: config::Config) -> Result<Arc<Self>, anyhow::Error> {
 
-        let https = HttpsConnector::new();
-
-        let client: ProxyClient =
-            hyper_util::client::legacy::Client::<(), ()>::builder(TokioExecutor::new())
-                .build(https);
+        let client = Client::builder()
+            .timeout(Duration::from_secs(30)) 
+            .connect_timeout(Duration::from_secs(10)) 
+            .pool_max_idle_per_host(10) 
+            .pool_idle_timeout(Duration::from_secs(90))
+            .user_agent("commune-public-appservice") 
+            .build()?;
 
         let appservice = appservice::AppService::new(&config).await?;
 
