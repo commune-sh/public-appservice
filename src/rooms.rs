@@ -361,8 +361,6 @@ pub async fn room_info (
         room_id = id.to_string();
     }
 
-    println!("query: {:#?}", query);
-
     let mut parsed_id = RoomId::parse(&room_id)
         .map_err(|_| AppserviceError::MatrixError("Invalid room ID".to_string()))?;
 

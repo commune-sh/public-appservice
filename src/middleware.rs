@@ -127,11 +127,10 @@ pub async fn validate_room_id(
         let id = state.appservice.room_id_from_alias(alias).await;
         match id {
             Ok(id) => {
-                println!("Fetched Room ID: {:#?}", id);
                 data.room_id = Some(id.to_string());
             }
             Err(_) => {
-                println!("Failed to get room ID from alias: {}", raw_alias);
+                tracing::info!("Failed to get room ID from alias: {}", raw_alias);
             }
         }
     }
@@ -152,7 +151,7 @@ pub async fn validate_room_id(
         let path_segments: Vec<&str> = fullpath.split('/').filter(|s| !s.is_empty()).collect();
         
         if let Some(segment_index) = pattern_segments.iter().position(|&s| s == ":room_id") {
-            println!("Found :room_id at segment index: {}", segment_index);
+
             let mut new_segments = path_segments.clone();
             if segment_index < new_segments.len() {
 
