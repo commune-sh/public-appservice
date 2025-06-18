@@ -3,6 +3,7 @@ pub mod appservice;
 pub mod server;
 pub mod ping;
 pub mod api;
+pub mod space;
 pub mod rooms;
 pub mod middleware;
 pub mod storage;

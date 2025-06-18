@@ -115,13 +115,16 @@ pub async fn validate_room_id(
         room_id: Some(room_id.clone()),
     };
 
+
     // This is a valid room_id, so move on
     if room_id_valid(&room_id, &server_name).is_ok() {
         req.extensions_mut().insert(data);
         return Ok(next.run(req).await);
     }
 
+
     let raw_alias = format!("#{}:{}", room_id, server_name);
+
 
     if let Ok(alias) = RoomAliasId::parse(&raw_alias) {
         let id = state.appservice.room_id_from_alias(alias).await;
@@ -149,8 +152,8 @@ pub async fn validate_room_id(
         };
 
         let path_segments: Vec<&str> = fullpath.split('/').filter(|s| !s.is_empty()).collect();
-        
-        if let Some(segment_index) = pattern_segments.iter().position(|&s| s == ":room_id") {
+
+        if let Some(segment_index) = pattern_segments.iter().position(|&s| s == "{room_id}") {
 
             let mut new_segments = path_segments.clone();
             if segment_index < new_segments.len() {
