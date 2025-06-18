@@ -11,6 +11,7 @@ pub struct Config {
     pub redis: Redis,
     pub cache: Cache,
     pub public_rooms: PublicRooms,
+    pub storage: Storage,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -91,6 +92,14 @@ pub struct PublicRooms {
     pub include_rooms: Vec<String>,
 }
 
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Storage {
+    pub access_key_id: String,
+    pub access_key_secret: String,
+    pub endpoint: String,
+    pub bucket: String,
+}
 
 impl Config {
     pub fn new(path: impl AsRef<Path>) -> Self {

@@ -5,6 +5,7 @@ pub mod ping;
 pub mod api;
 pub mod rooms;
 pub mod middleware;
+pub mod storage;
 pub mod cache;
 pub mod error;
 pub mod utils;
@@ -27,6 +28,7 @@ pub struct AppState {
     pub transaction_store: ping::TransactionStore,
     pub cache: cache::Cache,
     pub oidc: oidc::AuthMetadata,
+    pub storage: storage::Storage,
 }
 
 impl AppState {
@@ -46,7 +48,7 @@ impl AppState {
 
         let oidc = oidc::get_auth_metadata(&config.matrix.homeserver).await?;
 
-        println!("OIDC Metadata: {:?}", oidc);
+        let storage = storage::Storage::new(&config).await;
 
         Ok(Arc::new(Self {
             config,
@@ -55,6 +57,7 @@ impl AppState {
             transaction_store,
             cache,
             oidc,
+            storage,
         }))
     }
 }
