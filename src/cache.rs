@@ -5,6 +5,8 @@ use redis::{
     RedisError
 };
 
+use serde::{Serialize, Deserialize};
+
 use crate::rooms::PublicRoom;
 
 #[derive(Debug, Clone)]
@@ -15,19 +17,21 @@ pub struct Cache {
 impl Cache {
 
     pub async fn new(config: &Config) -> Result<Self, anyhow::Error> {
+
         let url = format!("redis://{}", config.redis.url);
         let client = redis::Client::open(url)?;
+
         Ok(Self { client })
+
     }
 
-    pub async fn cache_rooms(
-        &self,
-        rooms: &Vec<PublicRoom>,
-        ttl: u64,
-    ) -> Result<(), RedisError> {
+    pub async fn cache_data<T>(&self, key: &str, data: &T, ttl: u64) -> Result<(), RedisError>
+    where
+        T: Serialize,
+    {
         let mut conn = self.client.get_multiplexed_tokio_connection().await?;
 
-        let serialized = serde_json::to_string(rooms).map_err(|e| {
+        let serialized = serde_json::to_string(data).map_err(|e| {
             RedisError::from((
                 redis::ErrorKind::IoError,
                 "Serialization error",
@@ -35,29 +39,15 @@ impl Cache {
             ))
         })?;
 
-        conn.set_ex("public_rooms", serialized, ttl).await
+        conn.set_ex(key, serialized, ttl).await
     }
 
-    pub async fn get_cached_rooms(&self) -> Result<Vec<PublicRoom>, RedisError> {
+    pub async fn get_cached_data<T>(&self, key: &str) -> Result<T, RedisError>
+    where
+        T: for<'a> Deserialize<'a>,
+    {
         let mut conn = self.client.get_multiplexed_tokio_connection().await?;
 
-        let data: String = conn.get("public_rooms").await?;
-        serde_json::from_str(&data).map_err(|e| {
-            RedisError::from((
-                redis::ErrorKind::IoError,
-                "Deserialization error",
-                e.to_string(),
-            ))
-        })
-    }
-
-    pub async fn get_cached_room_state(
-        &self,
-        room_id: &str,
-    ) -> Result<Vec<PublicRoom>, RedisError> {
-        let mut conn = self.client.get_multiplexed_tokio_connection().await?;
-
-        let key = format!("room_state:{}", room_id);
         let data: String = conn.get(key).await?;
         serde_json::from_str(&data).map_err(|e| {
             RedisError::from((
@@ -68,24 +58,40 @@ impl Cache {
         })
     }
 
+    pub async fn cache_rooms(
+        &self,
+        rooms: &Vec<PublicRoom>,
+        ttl: u64,
+    ) -> Result<(), RedisError> {
+
+        self.cache_data("public_rooms", rooms, ttl).await
+
+    }
+
+    pub async fn get_cached_rooms(&self) -> Result<Vec<PublicRoom>, RedisError> {
+        self.get_cached_data("public_rooms").await
+    }
+
+    pub async fn get_cached_room_state(
+        &self,
+        room_id: &str,
+    ) -> Result<Vec<PublicRoom>, RedisError> {
+
+        let key = format!("room_state:{}", room_id);
+        self.get_cached_data(&key).await
+
+    }
+
     pub async fn cache_room_state(
         &self,
         room_id: &str,
         state: &Vec<PublicRoom>,
         ttl: u64,
     ) -> Result<(), RedisError> {
-        let mut conn = self.client.get_multiplexed_tokio_connection().await?;
 
         let key = format!("room_state:{}", room_id);
-        let serialized = serde_json::to_string(state).map_err(|e| {
-            RedisError::from((
-                redis::ErrorKind::IoError,
-                "Serialization error",
-                e.to_string(),
-            ))
-        })?;
+        self.cache_data(&key, state, ttl).await
 
-        conn.set_ex(key, serialized, ttl).await
     }
 
 }
