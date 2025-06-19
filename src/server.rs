@@ -43,7 +43,9 @@ use crate::api::{
     media_proxy
 };
 
-use crate::space::space_state;
+use crate::space::{
+    space_summary,
+};
 
 pub struct Server{
     state: Arc<AppState>,
@@ -129,10 +131,12 @@ impl Server {
             .route_layer(middleware::from_fn_with_state(self.state.clone(), is_admin));
 
         let space_routes_inner = Router::new()
-            .route("/state", get(space_state));
+            .route("/", get(space_summary));
 
         let space_routes = Router::new()
-            .nest("/_matrix/client/v3/space/{space}", space_routes_inner);
+            .nest("/_matrix/client/v3/space/{space}", space_routes_inner)
+            .route_layer(middleware::from_fn_with_state(self.state.clone(), validate_public_room))
+            .route_layer(middleware::from_fn_with_state(self.state.clone(), validate_room_id));
 
         let app = Router::new()
             .merge(service_routes)

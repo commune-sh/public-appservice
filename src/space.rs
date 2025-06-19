@@ -12,7 +12,7 @@ use std::sync::Arc;
 use serde_json::json;
 use crate::AppState;
 
-pub async fn space_state(
+pub async fn space_summary(
     State(state): State<Arc<AppState>>,
     Path(space): Path<String>,
 ) -> Result<impl IntoResponse, AppserviceError> {
@@ -32,7 +32,6 @@ pub async fn space_state(
         .await
         .map_err(|_| AppserviceError::AppserviceError("Failed to get room hierarchy".to_string()))?;
 
-    Ok(Json(json!({
-        "space": hierarchy,
-    })))
+    Ok(Json(json!(hierarchy)))
 }
+
