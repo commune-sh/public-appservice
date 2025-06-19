@@ -94,4 +94,33 @@ impl Cache {
 
     }
 
+    pub async fn cache_proxy_response(
+        &self, 
+        key: &str, 
+        data: &[u8], 
+        ttl: u64
+    ) -> Result<(), RedisError> {
+
+        let mut conn = self.client.get_multiplexed_tokio_connection().await?;
+        conn.set_ex(key, data, ttl).await
+    }
+
+    pub async fn get_cached_proxy_response(
+        &self, 
+        key: &str
+    ) -> Result<Vec<u8>, RedisError> {
+
+        let mut conn = self.client.get_multiplexed_tokio_connection().await?;
+
+        // check if the key exists
+        if !conn.exists(key).await? {
+            return Err(RedisError::from((
+                redis::ErrorKind::ResponseError,
+                "Key not found",
+            )));
+        }
+
+        conn.get(key).await
+    }
+
 }

@@ -71,6 +71,7 @@ fn default_false() -> bool {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Cache {
+    pub requests: CacheOptions,
     pub public_rooms: CacheOptions,
     pub room_state: CacheOptions,
     pub messages: CacheOptions,

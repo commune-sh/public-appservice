@@ -203,6 +203,26 @@ pub async fn matrix_proxy(
         }
     }
 
+    // check if response is cached and return it if so
+    if state.config.cache.requests.enabled {
+        if let Ok(cached_response) = state.cache.get_cached_proxy_response(&target_url).await {
+            tracing::info!("Returning cached response for {}", target_url);
+
+            if let Ok(response) = Response::builder()
+                .status(StatusCode::OK)
+                .header("Content-Type", "application/json")
+                .body(axum::body::Body::from(cached_response))
+                .map_err(|e| {
+                    tracing::error!("Failed to build response: {}", e);
+                }) {
+
+                return Ok(response);
+            }
+
+        }
+    }
+
+
     let body_bytes = match axum::body::to_bytes(req.into_body(), usize::MAX).await {
         Ok(bytes) => bytes,
         Err(_) => {
@@ -237,6 +257,25 @@ pub async fn matrix_proxy(
     let body = response.bytes()
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    // make a copy of body, not in bytes but as a Vec<u8> so it can be cached
+    let to_cache = body.to_vec();
+    let ttl = state.config.cache.requests.expire_after;
+
+    if state.config.cache.requests.enabled {
+        tokio::spawn(async move {
+            if let Ok(_) = state.cache.cache_proxy_response(
+                &target_url,
+                &to_cache,
+                ttl
+            ).await {
+                tracing::info!("Cached proxied response for {}", target_url);
+            } else {
+                tracing::warn!("Failed to cache proxied response for {}", target_url);
+            }
+        });
+    }
+
 
     let mut axum_response = Response::builder().status(status);
 
@@ -273,7 +312,7 @@ pub async fn media_proxy(
     let query = req.uri().query().map(|q| format!("?{}", q)).unwrap_or_default();
 
     let target_url = format!("{}{}{}", state.config.matrix.homeserver, path, query);
-    
+
     let body_bytes = match axum::body::to_bytes(req.into_body(), usize::MAX).await {
         Ok(bytes) => bytes,
         Err(_) => {
@@ -323,6 +362,7 @@ pub async fn media_proxy(
             tracing::error!("Failed to build response: {}", e);
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
+
 
     Ok(response)
 }

@@ -23,6 +23,10 @@ pool_size = 20
 timeout_secs = 5
 cache_ttl = 300
 
+[cache.requests]
+enabled = true
+ttl = 3600
+
 [cache.public_rooms]
 enabled = true
 expire_after = 3600
