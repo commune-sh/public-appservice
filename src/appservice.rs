@@ -87,6 +87,19 @@ impl AppService {
         })
     }
 
+    pub async fn health_check(&self) -> Result<(), anyhow::Error> {
+        // Perform a simple request to check if the appservice is healthy
+        let response = self.client
+            .send_request(whoami::v3::Request::new())
+            .await?;
+
+        if response.user_id == *self.user_id {
+            Ok(())
+        } else {
+            Err(anyhow::anyhow!("Health check failed: User ID mismatch"))
+        }
+    }
+
     pub async fn ping_homeserver(&self, id: String) -> Result<request_ping::v1::Response, anyhow::Error> {
 
         let mut req = request_ping::v1::Request::new(

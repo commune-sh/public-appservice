@@ -23,6 +23,7 @@ use serde_json::json;
 use http::header::CONTENT_TYPE;
 
 use anyhow;
+use crate::error::AppserviceError;
 
 use crate::config::Config;
 use crate::rooms::{public_rooms, room_info, join_room, leave_room};
@@ -41,6 +42,8 @@ use crate::api::{
     matrix_proxy,
     media_proxy
 };
+
+use crate::space::space_state;
 
 pub struct Server{
     state: Arc<AppState>,
@@ -124,6 +127,8 @@ impl Server {
             .route("/admin/room/{room_id}/join", put(join_room))
             .route("/admin/room/{room_id}/leave", put(leave_room))
             .route_layer(middleware::from_fn_with_state(self.state.clone(), is_admin));
+        let space_routes = Router::new()
+            .route("/space/{space}/state", get(space_state));
 
         let app = Router::new()
             .merge(service_routes)
@@ -133,8 +138,10 @@ impl Server {
             .merge(media_routes)
             .merge(public_rooms_route)
             .merge(admin_routes)
+            .merge(space_routes)
             .route("/version", get(version))
             .route("/identity", get(identity))
+            .route("/health", get(health))
             .route("/", get(index))
             .layer(self.setup_cors(&self.state.config))
             .layer(TraceLayer::new_for_http())
@@ -194,5 +201,17 @@ pub async fn identity(
 
     Ok(Json(json!({
         "user": user,
+    })))
+}
+
+pub async fn health(
+    State(state): State<Arc<AppState>>,
+) -> Result<impl IntoResponse, AppserviceError> {
+
+    let _ = state.appservice.health_check().await
+        .map_err(|_| AppserviceError::AppserviceError("Health check failed".to_string()))?;
+
+    Ok(Json(json!({
+        "status": "ok",
     })))
 }
