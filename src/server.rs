@@ -127,8 +127,12 @@ impl Server {
             .route("/admin/room/{room_id}/join", put(join_room))
             .route("/admin/room/{room_id}/leave", put(leave_room))
             .route_layer(middleware::from_fn_with_state(self.state.clone(), is_admin));
+
+        let space_routes_inner = Router::new()
+            .route("/state", get(space_state));
+
         let space_routes = Router::new()
-            .route("/space/{space}/state", get(space_state));
+            .nest("/_matrix/client/v3/space/{space}", space_routes_inner);
 
         let app = Router::new()
             .merge(service_routes)
