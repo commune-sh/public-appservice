@@ -39,6 +39,11 @@ expire_after = 3600
 enabled = true
 expire_after = 3600
 
+[spaces]
+default = ["art", "books", "music"]
+cache = true
+ttl = 3600
+
 [public_rooms]
 curated = false
 include_rooms = []
