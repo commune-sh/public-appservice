@@ -132,12 +132,8 @@ impl Server {
             .route("/admin/room/{room_id}/leave", put(leave_room))
             .route_layer(middleware::from_fn_with_state(self.state.clone(), is_admin));
 
-        let space_routes = Router::new()
-            .route("/spaces/{space}", get(space_summary))
-            .route_layer(middleware::from_fn_with_state(self.state.clone(), validate_public_room))
-            .route_layer(middleware::from_fn_with_state(self.state.clone(), validate_room_id));
-
         let spaces_routes = Router::new()
+            .route("/spaces/{space}", get(space_summary))
             .route("/spaces", get(spaces));
 
         let app = Router::new()
@@ -148,7 +144,6 @@ impl Server {
             .merge(media_routes)
             .merge(public_rooms_route)
             .merge(admin_routes)
-            .merge(space_routes)
             .merge(spaces_routes)
             .route("/version", get(version))
             .route("/identity", get(identity))
