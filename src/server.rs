@@ -45,6 +45,7 @@ use crate::api::{
 };
 
 use crate::space::{
+    spaces,
     space_summary,
 };
 
@@ -131,13 +132,13 @@ impl Server {
             .route("/admin/room/{room_id}/leave", put(leave_room))
             .route_layer(middleware::from_fn_with_state(self.state.clone(), is_admin));
 
-        let space_routes_inner = Router::new()
-            .route("/", get(space_summary));
-
         let space_routes = Router::new()
-            .nest("/_matrix/client/v3/space/{space}", space_routes_inner)
+            .route("/spaces/{space}", get(space_summary))
             .route_layer(middleware::from_fn_with_state(self.state.clone(), validate_public_room))
             .route_layer(middleware::from_fn_with_state(self.state.clone(), validate_room_id));
+
+        let spaces_routes = Router::new()
+            .route("/spaces", get(spaces));
 
         let app = Router::new()
             .merge(service_routes)
@@ -148,6 +149,7 @@ impl Server {
             .merge(public_rooms_route)
             .merge(admin_routes)
             .merge(space_routes)
+            .merge(spaces_routes)
             .route("/version", get(version))
             .route("/identity", get(identity))
             .route("/health", get(health))

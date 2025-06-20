@@ -8,6 +8,7 @@ use redis::{
 use serde::{Serialize, Deserialize};
 
 use crate::rooms::PublicRoom;
+use crate::appservice::RoomSummary;
 
 #[derive(Debug, Clone)]
 pub struct Cache {
@@ -81,6 +82,19 @@ impl Cache {
         self.get_cached_data(&key).await
 
     }
+
+    pub async fn cache_public_spaces(
+        &self,
+        rooms: &Vec<RoomSummary>,
+        ttl: u64,
+    ) -> Result<(), RedisError> {
+        self.cache_data("public_spaces", rooms, ttl).await
+    }
+
+    pub async fn get_cached_public_spaces(&self) -> Result<Vec<RoomSummary>, RedisError> {
+        self.get_cached_data("public_spaces").await
+    }
+
 
     pub async fn cache_room_state(
         &self,

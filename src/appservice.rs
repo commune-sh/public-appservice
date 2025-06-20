@@ -368,7 +368,8 @@ impl AppService {
 
             if event_type == "m.room.name" {
                 if let Ok(Some(content)) = state_event.get_field::<RoomNameEventContent>("content") {
-                    room_info.name = Some(content.name.to_string());
+                    let name = content.name.to_string();
+                    room_info.name = if name.is_empty() { None } else { Some(name) };
                 };
             }
 
@@ -392,7 +393,8 @@ impl AppService {
 
             if event_type == "m.room.topic" {
                 if let Ok(Some(content)) = state_event.get_field::<RoomTopicEventContent>("content") {
-                    room_info.topic = Some(content.topic.to_string());
+                    let topic = content.topic.to_string();
+                    room_info.topic = if topic.is_empty() { None } else { Some(topic) };
                 };
             }
         }
@@ -411,9 +413,40 @@ impl AppService {
         Ok(hierarchy.rooms)
     }
 
+    pub async fn get_public_spaces(&self) -> Result<Option<Vec<RoomSummary>>, anyhow::Error> {
+
+        let mut spaces = Vec::new();
+
+        let default_spaces = self.config.spaces.default.clone();
+
+        if default_spaces.is_empty() {
+            return Ok(None);
+        }
+
+        for space in default_spaces {
+
+            let server_name = self.config.matrix.server_name.clone();
+
+            let raw_alias = format!("#{}:{}", space, server_name);
+
+            let alias = RoomAliasId::parse(&raw_alias)
+                .map_err(|_| anyhow::anyhow!("No Alias"))?;
+
+            let room_id = self.room_id_from_alias(alias).await
+                .map_err(|_| anyhow::anyhow!("Not a valid space"))?;
+
+            let summary = self.get_room_summary(room_id).await?;
+
+            spaces.push(summary);
+        }
+
+        Ok(Some(spaces))
+
+    }
+
 }
 
-#[derive(Default, Debug, Deserialize, Serialize)]
+#[derive(Default, Clone, Debug, Deserialize, Serialize)]
 pub struct RoomSummary {
     pub room_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]

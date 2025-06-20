@@ -11,6 +11,7 @@ pub struct Config {
     pub redis: Redis,
     pub cache: Cache,
     pub public_rooms: PublicRooms,
+    pub spaces: Spaces,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -90,6 +91,23 @@ pub struct CacheOptions {
 pub struct PublicRooms {
     pub curated: bool,
     pub include_rooms: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Spaces {
+    pub default: Vec<String>,
+    pub cache: bool,
+    pub ttl: u64,
+}
+
+impl Default for Spaces {
+    fn default() -> Self {
+        Spaces {
+            default: Vec::new(),
+            cache: false,
+            ttl: 3600, 
+        }
+    }
 }
 
 impl Config {
