@@ -203,9 +203,10 @@ pub async fn matrix_proxy(
         }
     }
 
+    let cache_key = format!("proxy_request:{}", target_url.clone());
     // check if response is cached and return it if so
     if state.config.cache.requests.enabled {
-        if let Ok(cached_response) = state.cache.get_cached_proxy_response(&target_url).await {
+        if let Ok(cached_response) = state.cache.get_cached_proxy_response(&cache_key).await {
             tracing::info!("Returning cached response for {}", target_url);
 
             if let Ok(response) = Response::builder()
@@ -265,7 +266,7 @@ pub async fn matrix_proxy(
     if state.config.cache.requests.enabled {
         tokio::spawn(async move {
             if let Ok(_) = state.cache.cache_proxy_response(
-                &target_url,
+                &cache_key,
                 &to_cache,
                 ttl
             ).await {
