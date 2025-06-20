@@ -93,10 +93,27 @@ pub async fn is_admin(
 }
 
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Data {
     pub modified_path: Option<String>,
     pub room_id: Option<String>,
+    pub is_media_request: bool,
+}
+
+pub async fn add_data(
+    mut req: Request<Body>,
+    next: Next,
+) -> Result<impl IntoResponse, (StatusCode, Json<Value>)> {
+
+    let data = Data {
+        modified_path: None,
+        room_id: None,
+        is_media_request: req.uri().path().starts_with("/_matrix/client/v1/media/"),
+    };
+
+    req.extensions_mut().insert(data);
+
+    Ok(next.run(req).await)
 }
 
 pub async fn validate_room_id(
@@ -113,8 +130,8 @@ pub async fn validate_room_id(
     let mut data = Data {
         modified_path: None,
         room_id: Some(room_id.clone()),
+        is_media_request: req.uri().path().starts_with("/_matrix/media/v1/download/"),
     };
-
 
     // This is a valid room_id, so move on
     if room_id_valid(&room_id, &server_name).is_ok() {

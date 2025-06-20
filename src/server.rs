@@ -33,6 +33,7 @@ use crate::middleware::{
     is_public_room,
     validate_public_room,
     validate_room_id,
+    add_data
 };
 
 use crate::ping::ping;
@@ -40,7 +41,7 @@ use crate::ping::ping;
 use crate::api::{
     transactions,
     matrix_proxy,
-    media_proxy
+    //media_proxy
 };
 
 use crate::space::{
@@ -122,8 +123,8 @@ impl Server {
             //.route_layer(middleware::from_fn_with_state(self.state.clone(), public_rooms_cache));
 
         let media_routes = Router::new()
-            .route("/_matrix/client/v1/media/thumbnail/{*path}", get(media_proxy))
-            .route("/_matrix/client/v1/media/download/{*path}", get(media_proxy));
+            .route("/_matrix/client/v1/media/thumbnail/{*path}", get(matrix_proxy))
+            .route("/_matrix/client/v1/media/download/{*path}", get(matrix_proxy));
 
         let admin_routes = Router::new()
             .route("/admin/room/{room_id}/join", put(join_room))
@@ -152,6 +153,7 @@ impl Server {
             .route("/health", get(health))
             .route("/", get(index))
             .layer(self.setup_cors(&self.state.config))
+            .layer(middleware::from_fn_with_state(self.state.clone(), add_data))
             .layer(TraceLayer::new_for_http())
             .with_state(self.state.clone());
 

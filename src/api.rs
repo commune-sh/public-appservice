@@ -183,6 +183,9 @@ pub async fn matrix_proxy(
     State(state): State<Arc<AppState>>,
     req: Request<Body>,
 ) -> Result<Response<Body>, StatusCode> {
+
+    let is_media_request = data.is_media_request;
+
     let method = req.method().clone();
     let headers = req.headers().clone();
     
@@ -203,9 +206,10 @@ pub async fn matrix_proxy(
         }
     }
 
+
     let cache_key = format!("proxy_request:{}", target_url.clone());
     // check if response is cached and return it if so
-    if state.config.cache.requests.enabled {
+    if state.config.cache.requests.enabled && !is_media_request {
         if let Ok(cached_response) = state.cache.get_cached_proxy_response(&cache_key).await {
             tracing::info!("Returning cached response for {}", target_url);
 
@@ -263,7 +267,7 @@ pub async fn matrix_proxy(
     let to_cache = body.to_vec();
     let ttl = state.config.cache.requests.expire_after;
 
-    if state.config.cache.requests.enabled {
+    if state.config.cache.requests.enabled && !is_media_request {
         tokio::spawn(async move {
             if let Ok(_) = state.cache.cache_proxy_response(
                 &cache_key,
@@ -297,9 +301,12 @@ pub async fn matrix_proxy(
 }
 
 pub async fn media_proxy(
+    Extension(data): Extension<Data>,
     State(state): State<Arc<AppState>>,
     req: Request<Body>,
 ) -> Result<Response<Body>, StatusCode> {
+
+    println!("Is media request {}", data.is_media_request);
 
     let method = req.method().clone();
     let headers = req.headers().clone();
