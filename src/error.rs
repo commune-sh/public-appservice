@@ -10,7 +10,7 @@ use axum::{
 
 #[derive(Error, Debug)]
 pub enum AppserviceError {
-    #[error("Appservice error: {0}")]
+    #[error("{0}")]
     AppserviceError(String),
     #[error("Homeserver unreachable: {0}")]
     HomeserverError(String),
