@@ -107,6 +107,9 @@ impl Server {
             .route_layer(middleware::from_fn_with_state(self.state.clone(), validate_public_room))
             .route_layer(middleware::from_fn_with_state(self.state.clone(), validate_room_id));
 
+        let user_routes = Router::new()
+            .route("/_matrix/client/v3/profile/{user_id}", get(matrix_proxy));
+
         let public_room = Router::new()
             .route("/_matrix/client/v3/public/{room_id}", get(is_public_room))
             .route_layer(middleware::from_fn_with_state(self.state.clone(), validate_room_id));
@@ -140,6 +143,7 @@ impl Server {
             .merge(service_routes)
             .merge(room_routes)
             .merge(public_room)
+            .merge(user_routes)
             .merge(more_room_routes)
             .merge(media_routes)
             .merge(public_rooms_route)
