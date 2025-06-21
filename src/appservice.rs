@@ -340,8 +340,15 @@ impl AppService {
         Ok(profile)
     }
 
-    pub async fn get_room_summary(&self, room_id: OwnedRoomId) ->
-    Result<RoomSummary, anyhow::Error> {
+    pub async fn get_room_summary(&self, room_id: OwnedRoomId) -> Result<RoomSummary, anyhow::Error> {
+
+        // find out if appservice has joined the room or not
+        let has_joined = self.has_joined_room(room_id.clone()).await?;
+
+        if !has_joined {
+            // If not joined, we cannot get the state
+            return Err(anyhow::anyhow!("Appservice has not joined the room: {}", room_id));
+        }
 
         let mut room_info = RoomSummary {
             room_id: room_id.to_string(),
@@ -349,53 +356,50 @@ impl AppService {
         };
 
         let state = self.client
-            .send_request(get_state_events::v3::Request::new(
-                room_id,
-            ))
+            .send_request(get_state_events::v3::Request::new(room_id))
             .await?;
 
         for state_event in state.room_state {
-
             let event_type = match state_event.get_field::<String>("type") {
                 Ok(Some(t)) => t,
-                Ok(None) => {
-                    continue;
-                }
-                Err(_) => {
-                    continue;
-                }
+                _ => continue, 
             };
 
-            if event_type == "m.room.name" {
-                if let Ok(Some(content)) = state_event.get_field::<RoomNameEventContent>("content") {
-                    let name = content.name.to_string();
-                    room_info.name = if name.is_empty() { None } else { Some(name) };
-                };
-            }
-
-            if event_type == "m.room.canonical_alias" {
-                if let Ok(Some(content)) = state_event.get_field::<RoomCanonicalAliasEventContent>("content") {
-                    room_info.canonical_alias = content.alias.map(|a| a.to_string());
-                };
-            }
-
-            if event_type == "m.room.avatar" {
-                if let Ok(Some(content)) = state_event.get_field::<RoomAvatarEventContent>("content") {
-                    room_info.avatar_url = content.url.map(|u| u.to_string());
-                };
-            }
-
-            if event_type == "commune.room.banner" {
-                if let Ok(Some(content)) = state_event.get_field::<RoomAvatarEventContent>("content") {
-                    room_info.banner_url = content.url.map(|u| u.to_string());
-                };
-            }
-
-            if event_type == "m.room.topic" {
-                if let Ok(Some(content)) = state_event.get_field::<RoomTopicEventContent>("content") {
-                    let topic = content.topic.to_string();
-                    room_info.topic = if topic.is_empty() { None } else { Some(topic) };
-                };
+            match event_type.as_str() {
+                "m.room.name" => {
+                    if let Ok(Some(content)) = state_event.get_field::<RoomNameEventContent>("content") {
+                        room_info.name = if content.name.is_empty() { 
+                            None 
+                        } else { 
+                            Some(content.name.to_string()) 
+                        };
+                    }
+                }
+                "m.room.canonical_alias" => {
+                    if let Ok(Some(content)) = state_event.get_field::<RoomCanonicalAliasEventContent>("content") {
+                        room_info.canonical_alias = content.alias.map(|a| a.to_string());
+                    }
+                }
+                "m.room.avatar" => {
+                    if let Ok(Some(content)) = state_event.get_field::<RoomAvatarEventContent>("content") {
+                        room_info.avatar_url = content.url.map(|u| u.to_string());
+                    }
+                }
+                "commune.room.banner" => {
+                    if let Ok(Some(content)) = state_event.get_field::<RoomAvatarEventContent>("content") {
+                        room_info.banner_url = content.url.map(|u| u.to_string());
+                    }
+                }
+                "m.room.topic" => {
+                    if let Ok(Some(content)) = state_event.get_field::<RoomTopicEventContent>("content") {
+                        room_info.topic = if content.topic.is_empty() { 
+                            None 
+                        } else { 
+                            Some(content.topic.to_string()) 
+                        };
+                    }
+                }
+                _ => {} 
             }
         }
 
@@ -429,13 +433,20 @@ impl AppService {
 
             let raw_alias = format!("#{}:{}", space, server_name);
 
-            let alias = RoomAliasId::parse(&raw_alias)
-                .map_err(|_| anyhow::anyhow!("No Alias"))?;
+            let alias = match RoomAliasId::parse(&raw_alias) {
+                Ok(alias) => alias,
+                Err(_) => continue,
+            };
 
-            let room_id = self.room_id_from_alias(alias).await
-                .map_err(|_| anyhow::anyhow!("Not a valid space"))?;
+            let room_id = match self.room_id_from_alias(alias).await {
+                Ok(room_id) => room_id,
+                Err(_) => continue,
+            };
 
-            let summary = self.get_room_summary(room_id).await?;
+            let summary = match self.get_room_summary(room_id).await {
+                Ok(summary) => summary,
+                Err(_) => continue,
+            };
 
             spaces.push(summary);
         }
