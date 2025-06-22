@@ -18,8 +18,7 @@ homeserver = "http://localhost:8008"
 server_name = "commune.sh"
 
 [redis]
-url = "127.0.0.1:6379"
-db = 0
+url = "127.0.0.1:6379/0"
 pool_size = 20
 timeout_secs = 5
 cache_ttl = 300
