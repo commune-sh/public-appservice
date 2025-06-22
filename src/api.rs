@@ -61,7 +61,7 @@ pub async fn transactions(
                     tokio::spawn(async move {
                         // Join the room if history visibility is world readable
                         // delay for a moment to allow the event to be processed
-                        tokio::time::sleep(Duration::from_secs(3)).await;
+                        tokio::time::sleep(Duration::from_secs(5)).await;
 
                         let room_id = event.room_id().to_owned();
                         info!("Joining room: {}", room_id);
