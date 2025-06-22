@@ -41,6 +41,7 @@ expire_after = 3600
 
 [spaces]
 default = ["art", "books", "music"]
+include_all = false #Don't enable if you have a large number of public spaces
 cache = true
 ttl = 3600
 
