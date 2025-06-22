@@ -41,14 +41,14 @@ pub async fn transactions(
     let events = match payload.get("events") {
         Some(Value::Array(events)) => events,
         Some(_) | None => {
-            println!("Events is not an array");
+            tracing::info!("Events is not an array");
             return Ok(Json(json!({})))
         }
     };
 
     for event in events {
         if cfg!(debug_assertions) {
-            println!("Event: {:#?}", event);
+            tracing::info!("Event: {:#?}", event);
         }
 
         // If auto-join is enabled, join rooms with world_readable history visibility
@@ -56,11 +56,17 @@ pub async fn transactions(
             if let Ok(event) = serde_json::from_value::<RoomHistoryVisibilityEvent>(event.clone()) {
 
                 if event.history_visibility() == &HistoryVisibility::WorldReadable {
-                    println!("History Visibility: World Readable");
+                    tracing::info!("History Visibility: World Readable");
 
-                    let room_id = event.room_id().to_owned();
-                    info!("Joining room: {}", room_id);
-                    let _ =state.appservice.join_room(room_id).await;
+                    tokio::spawn(async move {
+                        // Join the room if history visibility is world readable
+                        // delay for a moment to allow the event to be processed
+                        tokio::time::sleep(Duration::from_secs(3)).await;
+
+                        let room_id = event.room_id().to_owned();
+                        info!("Joining room: {}", room_id);
+                        let _ = state.appservice.join_room(room_id).await;
+                    });
 
                     return Ok(Json(json!({})))
                 }
@@ -77,7 +83,7 @@ pub async fn transactions(
 
         match room_id {
             Some(room_id) => {
-                println!("Room ID: {}", room_id);
+                tracing::info!("Room ID: {}", room_id);
                 let room_id = RoomId::parse(room_id);
                  match (event_type, public) {
                     (Some("commune.room.public"), Some(true)) => {
@@ -85,7 +91,7 @@ pub async fn transactions(
                         let _ = state.appservice.join_room(room_id).await;
                     },
                     (Some("commune.room.public"), Some(false)) => {
-                        println!("Leave room");
+                        tracing::info!("Leave room");
 
                     }
                     _ => {}
@@ -306,7 +312,7 @@ pub async fn media_proxy(
     req: Request<Body>,
 ) -> Result<Response<Body>, StatusCode> {
 
-    println!("Is media request {}", data.is_media_request);
+    tracing::info!("Is media request {}", data.is_media_request);
 
     let method = req.method().clone();
     let headers = req.headers().clone();
