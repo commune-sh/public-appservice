@@ -416,7 +416,7 @@ pub async fn room_info (
             info.event = Some(event.clone());
 
             if let Ok(Some(sender)) = event.get_field::<String>("sender") {
-                println!("sender: {:#?}", sender);
+                tracing::info!("sender: {:#?}", sender);
 
                 let profile = state.appservice.get_profile(sender)
                     .await
@@ -442,7 +442,7 @@ pub async fn join_room (
     Path(room_id): Path<String>,
 ) -> Result<impl IntoResponse, AppserviceError> {
 
-    println!("Requested to join room: {}", room_id);
+    tracing::info!("Requested to join room: {}", room_id);
 
     let room_id = RoomId::parse(&room_id)
         .map_err(|_| AppserviceError::MatrixError("Invalid room ID".to_string()))?;
@@ -462,7 +462,7 @@ pub async fn leave_room (
     Path(room_id): Path<String>,
 ) -> Result<impl IntoResponse, AppserviceError> {
 
-    println!("Requested to leave room: {}", room_id);
+    tracing::info!("Requested to leave room: {}", room_id);
 
     let room_id = RoomId::parse(&room_id)
         .map_err(|_| AppserviceError::MatrixError("Invalid room ID".to_string()))?;

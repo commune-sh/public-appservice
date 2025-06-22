@@ -75,7 +75,7 @@ impl AppService {
             .await;
 
         if whoami.is_err() {
-            eprintln!("Failed to authenticate with homeserver. Check your access token.");
+            tracing::info!("Failed to authenticate with homeserver. Check your access token.");
             std::process::exit(1);
         }
 
@@ -172,7 +172,7 @@ impl AppService {
             ))
             .await?;
 
-        println!("Hierarchy rooms: {:#?}", hierarchy.rooms.len());
+        tracing::info!("Hierarchy rooms: {:#?}", hierarchy.rooms.len());
 
         for room in hierarchy.rooms {
             if room.room_id == room_id {
@@ -183,7 +183,7 @@ impl AppService {
                     room.room_id.clone()
                 ))
                 .await?;
-            println!("Left child room: {:#?}", room.room_id);
+            tracing::info!("Left child room: {:#?}", room.room_id);
             tracing::info!("Left child room: {:#?}", left);
         }
 

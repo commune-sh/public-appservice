@@ -64,7 +64,7 @@ pub async fn ping(
     let txn_id = payload.transaction_id.clone();
 
     if !state.transaction_store.verify_and_remove_transaction(&txn_id).await {
-        println!("Transaction ID does not match: {}", txn_id);
+        tracing::info!("Transaction ID does not match: {}", txn_id);
     }
 
     Ok(Json(json!({})))

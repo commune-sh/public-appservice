@@ -168,14 +168,14 @@ impl Server {
             let ping = ping_state.appservice.ping_homeserver(txn_id.clone()).await;
             match ping {
                 Ok(_) => info!("Homeserver pinged successfully."),
-                Err(e) => eprintln!("Failed to ping homeserver: {}", e),
+                Err(e) => tracing::info!("Failed to ping homeserver: {}", e),
             }
         });
 
         if let Ok(listener) = tokio::net::TcpListener::bind(addr.clone()).await {
             axum::serve(listener, ServiceExt::<Request>::into_make_service(app)).await?;
         } else {
-            eprintln!("Failed to bind to address: {}", addr);
+            tracing::info!("Failed to bind to address: {}", addr);
             std::process::exit(1);
         }
 

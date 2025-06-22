@@ -19,7 +19,7 @@ async fn main() {
     let state = AppState::new(config.clone())
         .await
         .unwrap_or_else(|e| {
-            eprintln!("Failed to initialize state: {}", e);
+            tracing::info!("Failed to initialize state: {}", e);
             std::process::exit(1);
         });
 
@@ -29,7 +29,7 @@ async fn main() {
     .run()
     .await 
     .unwrap_or_else(|e| {
-        eprintln!("Server error: {}", e);
+        tracing::info!("Server error: {}", e);
         std::process::exit(1);
     }); 
 
