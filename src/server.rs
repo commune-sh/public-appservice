@@ -93,6 +93,7 @@ impl Server {
 
         let room_routes_inner = Router::new()
             .route("/state", get(matrix_proxy))
+            .route("/state/{*path}", get(matrix_proxy))
             .route("/messages", get(matrix_proxy))
             .route("/info", get(room_info))
             .route("/joined_members", get(matrix_proxy))
