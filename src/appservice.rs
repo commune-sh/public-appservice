@@ -383,7 +383,13 @@ impl AppService {
                 "m.room.avatar" => {
                     if let Ok(Some(content)) = state_event.get_field::<RoomAvatarEventContent>("content") {
                         room_info.avatar_url = match content.url {
-                            Some(url) => Some(url.to_string()),
+                            Some(url) => {
+                                if url.to_string().is_empty() {
+                                    None
+                                } else {
+                                    Some(url.to_string())
+                                }
+                            }
                             None => None,
                         };
                     }
