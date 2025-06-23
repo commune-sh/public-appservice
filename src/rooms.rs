@@ -68,7 +68,12 @@ pub async fn public_rooms (
         .await {
             Ok(Some(rooms)) => rooms,
             Ok(None) | Err(_) => {
-                return Err(AppserviceError::MatrixError("Failed to fetch rooms".to_string()));
+                return Ok((
+                    StatusCode::OK,
+                    Json(json!({
+                        "rooms": {}
+                    }))
+                ))
             }
         };
 
