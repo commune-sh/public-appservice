@@ -30,7 +30,6 @@ use crate::rooms::{public_rooms, room_info, join_room, leave_room};
 use crate::middleware::{
     is_admin,
     authenticate_homeserver,
-    is_public_room,
     validate_public_room,
     validate_room_id,
     add_data
@@ -110,11 +109,6 @@ impl Server {
         let user_routes = Router::new()
             .route("/_matrix/client/v3/profile/{user_id}", get(matrix_proxy));
 
-        let public_room = Router::new()
-            .route("/_matrix/client/v3/public/{room_id}", get(is_public_room))
-            .route_layer(middleware::from_fn_with_state(self.state.clone(), validate_room_id));
-
-
         let more_room_routes = Router::new()
             .route("/_matrix/client/v1/rooms/{room_id}/hierarchy", get(matrix_proxy))
             .route("/_matrix/client/v1/rooms/{room_id}/threads", get(matrix_proxy))
@@ -142,7 +136,6 @@ impl Server {
         let app = Router::new()
             .merge(service_routes)
             .merge(room_routes)
-            .merge(public_room)
             .merge(user_routes)
             .merge(more_room_routes)
             .merge(media_routes)
