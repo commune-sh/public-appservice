@@ -71,7 +71,7 @@ pub async fn public_rooms (
                 return Ok((
                     StatusCode::OK,
                     Json(json!({
-                        "rooms": {}
+                        "rooms": []
                     }))
                 ))
             }
