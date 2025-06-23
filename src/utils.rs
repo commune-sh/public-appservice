@@ -26,3 +26,8 @@ static SLUG_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"[^a-zA-Z0-9]+").unwra
 pub fn slugify(s: &str) -> String {
     SLUG_REGEX.replace_all(s, "-").to_string().to_lowercase()
 }
+
+pub fn room_alias_like(alias: &str) -> bool {
+    let parts: Vec<&str> = alias.split(':').collect();
+    parts.len() == 2 && !parts[0].is_empty() && !parts[1].is_empty()
+}

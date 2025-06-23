@@ -31,7 +31,7 @@ use serde_json::{
 use std::sync::Arc;
 
 use crate::AppState;
-use crate::utils::room_id_valid;
+use crate::utils::{room_alias_like, room_id_valid};
 
 use crate::error::AppserviceError;
 
@@ -139,9 +139,10 @@ pub async fn validate_room_id(
         return Ok(next.run(req).await);
     }
 
-
-    let raw_alias = format!("#{}:{}", room_id, server_name);
-
+    // If the alias is partial like room:server.com without the leading #, we assume it's a room alias
+    let raw_alias = room_alias_like(&room_id) 
+        .then_some(format!("#{}", room_id))
+        .unwrap_or_else(|| format!("#{}:{}", room_id, server_name));
 
     if let Ok(alias) = RoomAliasId::parse(&raw_alias) {
         let id = state.appservice.room_id_from_alias(alias).await;
