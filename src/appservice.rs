@@ -382,12 +382,18 @@ impl AppService {
                 }
                 "m.room.avatar" => {
                     if let Ok(Some(content)) = state_event.get_field::<RoomAvatarEventContent>("content") {
-                        room_info.avatar_url = content.url.map(|u| u.to_string());
+                        room_info.avatar_url = match content.url {
+                            Some(url) => Some(url.to_string()),
+                            None => None,
+                        };
                     }
                 }
                 "commune.room.banner" => {
                     if let Ok(Some(content)) = state_event.get_field::<RoomAvatarEventContent>("content") {
-                        room_info.banner_url = content.url.map(|u| u.to_string());
+                        room_info.banner_url = match content.url {
+                            Some(url) => Some(url.to_string()),
+                            None => None,
+                        };
                     }
                 }
                 "m.room.topic" => {
