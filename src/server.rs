@@ -94,9 +94,12 @@ impl Server {
         let room_routes_inner = Router::new()
             .route("/state", get(matrix_proxy))
             .route("/state/{*path}", get(matrix_proxy))
+            .route("/events", get(matrix_proxy))
             .route("/messages", get(matrix_proxy))
             .route("/info", get(room_info))
             .route("/joined_members", get(matrix_proxy))
+            .route("/members", get(matrix_proxy))
+            .route("/initialSync", get(matrix_proxy))
             .route("/aliases", get(matrix_proxy))
             .route("/event/{*path}", get(matrix_proxy))
             .route("/context/{*path}", get(matrix_proxy))
@@ -107,9 +110,6 @@ impl Server {
             .route_layer(middleware::from_fn_with_state(self.state.clone(), validate_public_room))
             .route_layer(middleware::from_fn_with_state(self.state.clone(), validate_room_id));
 
-        let user_routes = Router::new()
-            .route("/_matrix/client/v3/profile/{user_id}", get(matrix_proxy));
-
         let more_room_routes = Router::new()
             .route("/_matrix/client/v1/rooms/{room_id}/hierarchy", get(matrix_proxy))
             .route("/_matrix/client/v1/rooms/{room_id}/threads", get(matrix_proxy))
@@ -119,9 +119,9 @@ impl Server {
 
         let public_rooms_route = Router::new()
             .route("/publicRooms", get(public_rooms));
-            //.route_layer(middleware::from_fn_with_state(self.state.clone(), public_rooms_cache));
 
         let media_routes = Router::new()
+            .route("/_matrix/client/v1/media/preview_url", get(matrix_proxy))
             .route("/_matrix/client/v1/media/thumbnail/{*path}", get(matrix_proxy))
             .route("/_matrix/client/v1/media/download/{*path}", get(matrix_proxy));
 
@@ -137,7 +137,6 @@ impl Server {
         let app = Router::new()
             .merge(service_routes)
             .merge(room_routes)
-            .merge(user_routes)
             .merge(more_room_routes)
             .merge(media_routes)
             .merge(public_rooms_route)
