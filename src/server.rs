@@ -40,7 +40,7 @@ use crate::ping::ping;
 use crate::api::{
     transactions,
     matrix_proxy,
-    //media_proxy
+    matrix_proxy_post
 };
 
 use crate::space::{
@@ -134,6 +134,9 @@ impl Server {
             .route("/spaces/{space}", get(space_summary))
             .route("/spaces", get(spaces));
 
+        let search_route = Router::new()
+            .route("/_matrix/client/v3/search", post(matrix_proxy_post));
+
         let app = Router::new()
             .merge(service_routes)
             .merge(room_routes)
@@ -142,6 +145,7 @@ impl Server {
             .merge(public_rooms_route)
             .merge(admin_routes)
             .merge(spaces_routes)
+            .merge(search_route)
             .route("/version", get(version))
             .route("/identity", get(identity))
             .route("/health", get(health))

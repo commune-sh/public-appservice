@@ -306,26 +306,32 @@ pub async fn matrix_proxy(
     Ok(response)
 }
 
-pub async fn media_proxy(
+
+pub async fn matrix_proxy_post(
     Extension(data): Extension<Data>,
     State(state): State<Arc<AppState>>,
     req: Request<Body>,
 ) -> Result<Response<Body>, StatusCode> {
 
-    tracing::info!("Is media request {}", data.is_media_request);
-
     let method = req.method().clone();
     let headers = req.headers().clone();
     
-    let path = if let Some(original_uri) = req.extensions().get::<OriginalUri>() {
+    let path = if let Some(mod_path) = data.modified_path.as_ref() {
+        mod_path.as_str()
+    } else if let Some(original_uri) = req.extensions().get::<OriginalUri>() {
         original_uri.0.path()
     } else {
         req.uri().path()
     };
 
-    let query = req.uri().query().map(|q| format!("?{}", q)).unwrap_or_default();
-
-    let target_url = format!("{}{}{}", state.config.matrix.homeserver, path, query);
+    let mut target_url = format!("{}{}", state.config.matrix.homeserver, path);
+    
+    if data.modified_path.is_none() {
+        if let Some(query) = req.uri().query() {
+            target_url.push('?');
+            target_url.push_str(query);
+        }
+    }
 
     let body_bytes = match axum::body::to_bytes(req.into_body(), usize::MAX).await {
         Ok(bytes) => bytes,
@@ -336,7 +342,7 @@ pub async fn media_proxy(
 
     let mut request_builder = state.proxy
         .request(method, &target_url)
-        .timeout(Duration::from_secs(25)) 
+        .timeout(Duration::from_secs(25)) // Slightly less than overall timeout
         .bearer_auth(&state.config.appservice.access_token);
 
     let mut filtered_headers = HeaderMap::new();
@@ -362,6 +368,7 @@ pub async fn media_proxy(
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
+
     let mut axum_response = Response::builder().status(status);
 
     for (name, value) in headers.iter() {
@@ -377,7 +384,6 @@ pub async fn media_proxy(
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
-
     Ok(response)
 }
 
@@ -388,3 +394,4 @@ fn is_hop_by_hop_header(name: &str) -> bool {
         "proxy-authorization" | "te" | "trailers" | "transfer-encoding" | "upgrade"
     )
 }
+
