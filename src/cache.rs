@@ -59,6 +59,11 @@ impl Cache {
         })
     }
 
+    pub async fn delete_cached_data(&self, key: &str) -> Result<(), RedisError> {
+        let mut conn = self.client.get_multiplexed_tokio_connection().await?;
+        conn.del(key).await
+    }
+
     pub async fn cache_rooms(
         &self,
         rooms: &Vec<PublicRoom>,

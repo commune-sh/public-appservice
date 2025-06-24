@@ -114,7 +114,9 @@ pub async fn transactions(
                 }
                 Some(false) => {
                     info!("Leaving room: {}", room_id);
-                    let _ = state.appservice.leave_room(room_id).await;
+                    let _ = state.appservice.leave_room(room_id.clone()).await;
+                    let cache_key = format!("appservice:joined:{}", room_id);
+                    let _ = state.cache.delete_cached_data(&cache_key).await;
                 }
                 None => {}
             }
