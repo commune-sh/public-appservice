@@ -24,6 +24,8 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tracing::info;
 
+use sha2::{Sha256, Digest};
+
 use crate::AppState;
 use crate::middleware::Data;
 
@@ -269,7 +271,6 @@ pub async fn matrix_proxy(
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    // make a copy of body, not in bytes but as a Vec<u8> so it can be cached
     let to_cache = body.to_vec();
     let ttl = state.config.cache.requests.expire_after;
 
@@ -307,7 +308,7 @@ pub async fn matrix_proxy(
 }
 
 
-pub async fn matrix_proxy_post(
+pub async fn matrix_proxy_search(
     Extension(data): Extension<Data>,
     State(state): State<Arc<AppState>>,
     req: Request<Body>,
@@ -340,6 +341,36 @@ pub async fn matrix_proxy_post(
         }
     };
 
+    let cache_key = if state.config.cache.search.enabled {
+        let mut hasher = Sha256::new();
+        hasher.update(&body_bytes);
+        let body_hash = format!("{:x}", hasher.finalize());
+        format!("proxy_post_request:{}:{}", target_url, body_hash)
+    } else {
+        String::new() 
+    };
+
+    if state.config.cache.search.enabled {
+        if let Ok(cached_response) = state.cache.get_cached_proxy_response(&cache_key).await {
+            tracing::info!("Returning cached search response for {}", target_url);
+
+            if let Ok(response) = Response::builder()
+                .status(StatusCode::OK)
+                .header("Content-Type", "application/json")
+                .body(axum::body::Body::from(cached_response))
+                .map_err(|e| {
+                    tracing::error!("Failed to build response: {}", e);
+                }) {
+
+                return Ok(response);
+            }
+
+        }
+    }
+
+
+    println!("[DEBUG] Cache key: {}", cache_key);
+
     let mut request_builder = state.proxy
         .request(method, &target_url)
         .timeout(Duration::from_secs(25)) // Slightly less than overall timeout
@@ -367,6 +398,24 @@ pub async fn matrix_proxy_post(
     let body = response.bytes()
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+
+    let to_cache = body.to_vec();
+    let ttl = state.config.cache.search.expire_after;
+
+    if state.config.cache.search.enabled {
+        tokio::spawn(async move {
+            if let Ok(_) = state.cache.cache_proxy_response(
+                &cache_key,
+                &to_cache,
+                ttl
+            ).await {
+                tracing::info!("Cached proxied search response for {}", target_url);
+            } else {
+                tracing::warn!("Failed to cache search response for {}", target_url);
+            }
+        });
+    }
 
 
     let mut axum_response = Response::builder().status(status);

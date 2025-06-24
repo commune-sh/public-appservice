@@ -39,6 +39,10 @@ expire_after = 3600
 enabled = true
 expire_after = 3600
 
+[cache.search]
+enabled = false
+ttl = 360
+
 [spaces]
 default = ["art", "books", "music"]
 include_all = false #Don't enable if you have a large number of public spaces

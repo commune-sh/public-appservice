@@ -77,6 +77,7 @@ pub struct Cache {
     pub room_state: CacheOptions,
     pub messages: CacheOptions,
     pub media: CacheOptions,
+    pub search: CacheOptions,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
