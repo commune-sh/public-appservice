@@ -215,12 +215,31 @@ pub async fn validate_public_room(
     let id = RoomId::parse(room_id)
         .map_err(|_| AppserviceError::AppserviceError("Invalid room ID".to_string()))?;
 
-    let joined = state.appservice.has_joined_room(id)
-        .await
-        .map_err(|_| AppserviceError::AppserviceError("Failed to check room membership".to_string()))?;
+    let cache_key = format!("appservice:joined:{}", room_id);
+
+
+    let joined = match state.cache.get_cached_data::<bool>(&cache_key).await {
+        Ok(cached_result) => {
+            tracing::info!("Using cached joined status for room: {}", room_id);
+            cached_result
+        },
+        Err(_) => {
+            let result = state.appservice.has_joined_room(id)
+                .await
+                .map_err(|_| AppserviceError::AppserviceError("Failed to check room membership".to_string()))?;
+            
+            if let Ok(_) = state.cache.cache_data(&cache_key, &result, 300).await {
+                tracing::info!("Cached joined status for room: {}", room_id);
+            } else {
+                tracing::warn!("Failed to cache joined status for room: {}", room_id);
+            
+            }
+            result
+        }
+    };
 
     if !joined {
-        return Err(AppserviceError::AppserviceError("User is not in room".to_string()));
+        return Err(AppserviceError::AppserviceError("Not a public room".to_string()));
     }
 
     Ok(next.run(req).await)
