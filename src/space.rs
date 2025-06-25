@@ -12,6 +12,8 @@ use std::sync::Arc;
 use serde_json::json;
 use crate::AppState;
 
+use crate::appservice::RoomSummary;
+
 pub async fn spaces(
     State(state): State<Arc<AppState>>,
 ) -> Result<impl IntoResponse, AppserviceError> {
@@ -77,11 +79,36 @@ pub async fn space(
 
     let room_id = state.appservice.room_id_from_alias(alias).await
         .map_err(|_| AppserviceError::AppserviceError("Space does not exist.".to_string()))?;
+    //
+    // Return from cache if enabled and available
+    if state.config.spaces.cache {
+        let key = format!("space_summary:{}", space);
+        if let Some(summary) = state.cache.get_cached_data::<RoomSummary>(&key).await.ok() {
+            tracing::info!("Returning cached space summary for {}", space);
+            return Ok(Json(json!(summary)));
+        }
+    }
 
 
     let summary = state.appservice.get_room_summary(room_id.clone())
         .await
         .map_err(|_| AppserviceError::AppserviceError("Failed to get space summary".to_string()))?;
+
+    if state.config.spaces.cache {
+        let summary = summary.clone();
+        tokio::spawn(async move {
+            let key = format!("space_summary:{}", space);
+            if let Ok(_) = state.cache.cache_data(
+                &key,
+                &summary,
+                state.config.spaces.ttl
+            ).await {
+                tracing::info!("Cached space summary for {}", space);
+            } else {
+                tracing::warn!("Failed to cache space summary for {}", space);
+            }
+        });
+    }
 
     Ok(Json(json!(summary)))
 }
