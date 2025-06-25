@@ -1,0 +1,100 @@
+# .github/workflows/release.yml
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-x86:
+    name: Build x86_64
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Build release binary
+        run: cargo build --release
+      
+      - name: Get version from tag
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+      
+      - name: Package binary
+        run: |
+          cd target/release
+          tar czf ../../${{ github.event.repository.name }}-${{ steps.get_version.outputs.VERSION }}-x86_64.tar.gz ${{ github.event.repository.name }}
+          cd ../..
+      
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.event.repository.name }}-${{ steps.get_version.outputs.VERSION }}-x86_64
+          path: ${{ github.event.repository.name }}-${{ steps.get_version.outputs.VERSION }}-x86_64.tar.gz
+
+  build-arm64:
+    name: Build ARM64
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Build release binary
+        run: cargo build --release
+      
+      - name: Get version from tag
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+      
+      - name: Package binary
+        run: |
+          cd target/release
+          tar czf ../../${{ github.event.repository.name }}-${{ steps.get_version.outputs.VERSION }}-arm64.tar.gz ${{ github.event.repository.name }}
+          cd ../..
+      
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.event.repository.name }}-${{ steps.get_version.outputs.VERSION }}-arm64
+          path: ${{ github.event.repository.name }}-${{ steps.get_version.outputs.VERSION }}-arm64.tar.gz
+
+  create-source-archive:
+    name: Create source archive
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Get version from tag
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+      
+      - name: Create source archive
+        run: git archive --format=tar.gz --prefix=${{ github.event.repository.name }}-${{ steps.get_version.outputs.VERSION }}/ HEAD > source.tar.gz
+      
+      - name: Upload source archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-archive
+          path: source.tar.gz
+
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [build-x86, build-arm64, create-source-archive]
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            */*.tar.gz
