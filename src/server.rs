@@ -44,8 +44,8 @@ use crate::api::{
 };
 
 use crate::space::{
+    space,
     spaces,
-    space_summary,
 };
 
 pub struct Server{
@@ -131,7 +131,7 @@ impl Server {
             .route_layer(middleware::from_fn_with_state(self.state.clone(), is_admin));
 
         let spaces_routes = Router::new()
-            .route("/spaces/{space}", get(space_summary))
+            .route("/spaces/{space}", get(space))
             .route("/spaces", get(spaces));
 
         let search_route = Router::new()

@@ -63,7 +63,7 @@ pub async fn spaces(
 }
 
 
-pub async fn space_summary(
+pub async fn space(
     State(state): State<Arc<AppState>>,
     Path(space): Path<String>,
 ) -> Result<impl IntoResponse, AppserviceError> {
@@ -78,10 +78,11 @@ pub async fn space_summary(
     let room_id = state.appservice.room_id_from_alias(alias).await
         .map_err(|_| AppserviceError::AppserviceError("Space does not exist.".to_string()))?;
 
-    let hierarchy = state.appservice.get_room_hierarchy(room_id.clone())
-        .await
-        .map_err(|_| AppserviceError::AppserviceError("Failed to get space hierarchy".to_string()))?;
 
-    Ok(Json(json!(hierarchy)))
+    let summary = state.appservice.get_room_summary(room_id.clone())
+        .await
+        .map_err(|_| AppserviceError::AppserviceError("Failed to get space summary".to_string()))?;
+
+    Ok(Json(json!(summary)))
 }
 
