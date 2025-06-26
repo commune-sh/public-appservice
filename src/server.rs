@@ -219,7 +219,14 @@ pub async fn health(
     let _ = state.appservice.health_check().await
         .map_err(|_| AppserviceError::AppserviceError("Health check failed".to_string()))?;
 
+    let user = format!(
+        "@{}:{}", 
+        state.config.appservice.sender_localpart, 
+        state.config.matrix.server_name
+    );
+
     Ok(Json(json!({
         "status": "ok",
+        "user_id": user,
     })))
 }
