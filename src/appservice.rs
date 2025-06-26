@@ -164,6 +164,19 @@ impl AppService {
         Ok(state.room_state)
     }
 
+    pub async fn is_space(&self, room_id: OwnedRoomId) -> Result<bool, anyhow::Error> {
+
+        let hierarchy = self.client
+            .send_request(get_hierarchy::v1::Request::new(
+                room_id.clone()
+            ))
+            .await?;
+
+        // hierarchy contains the room itself and all child rooms
+        // so we check if there is more than one room in the hierarchy
+        Ok(hierarchy.rooms.len() > 1)
+    }
+
     pub async fn leave_room(&self, room_id: OwnedRoomId) -> Result<(), anyhow::Error>{
         // First leave all child rooms
         let hierarchy = self.client
@@ -432,6 +445,44 @@ impl AppService {
     pub async fn get_public_spaces(&self) -> Result<Option<Vec<RoomSummary>>, anyhow::Error> {
 
         let mut spaces = Vec::new();
+
+        if self.config.spaces.include_all {
+            let jr = self.client
+                .send_request(joined_rooms::v3::Request::new())
+                .await?;
+
+            if jr.joined_rooms.is_empty() {
+                return Ok(None);
+            }
+
+            for room_id in jr.joined_rooms {
+
+                // Check if the room is a space
+                let is_space = match self.is_space(room_id.clone()).await {
+                    Ok(is_space) => is_space,
+                    Err(_) => continue,
+                };
+
+                if !is_space {
+                    continue;
+                }
+
+                let summary = match self.get_room_summary(room_id).await {
+                    Ok(summary) => summary,
+                    Err(_) => continue,
+                };
+
+                spaces.push(summary);
+            }
+
+            if spaces.is_empty() {
+                return Ok(None);
+            }
+
+            return Ok(Some(spaces));
+
+        }
+
 
         let default_spaces = self.config.spaces.default.clone();
 
