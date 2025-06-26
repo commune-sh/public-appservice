@@ -12,6 +12,7 @@ pub struct Config {
     pub cache: Cache,
     pub public_rooms: PublicRooms,
     pub spaces: Spaces,
+    pub logging: Option<Logging>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -102,15 +103,10 @@ pub struct Spaces {
     pub ttl: u64,
 }
 
-impl Default for Spaces {
-    fn default() -> Self {
-        Spaces {
-            default: Vec::new(),
-            include_all: false,
-            cache: false,
-            ttl: 3600, 
-        }
-    }
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Logging {
+    pub directory: String,
+    pub filename: String,
 }
 
 impl Config {
