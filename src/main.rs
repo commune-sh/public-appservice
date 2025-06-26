@@ -49,6 +49,14 @@ pub fn setup_tracing(config: &Config) -> WorkerGuard {
         None => "./logs".to_string(),
     };
 
+    if !std::path::Path::new(&log_directory).exists() {
+        std::fs::create_dir_all(&log_directory)
+            .unwrap_or_else(|e| {
+                tracing::info!("Failed to create log directory: {}", e);
+                std::process::exit(1);
+            });
+    }
+
     let log_filename = match &config.logging {
         Some(logging) => logging.filename.clone(),
         None => "commune.log".to_string(),
