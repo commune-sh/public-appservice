@@ -1,4 +1,8 @@
 use crate::config::Config;
+use std::sync::Arc;
+use tokio::sync::Semaphore;
+use futures::future::join_all;
+use std::collections::HashSet;
 
 use ruma::{
     OwnedRoomId,
@@ -232,6 +236,114 @@ impl AppService {
     }
 
     pub async fn joined_rooms_state(&self) -> Result<Option<Vec<JoinedRoomState>>, anyhow::Error> {
+        let semaphore = Arc::new(Semaphore::new(10)); 
+        let curated = self.config.public_rooms.curated;
+        let include_rooms = &self.config.public_rooms.include_rooms;
+
+        if curated && !include_rooms.is_empty() {
+            let mut all_room_ids = Vec::new();
+
+            let space_futures: Vec<_> = include_rooms
+                .iter()
+                .map(|local_part| {
+                    let sem = semaphore.clone();
+                    let server_name = self.config.matrix.server_name.clone();
+                    let self_ref = self;
+                    async move {
+                        let _permit = sem.acquire().await.ok()?;
+
+                        let alias = format!("#{}:{}", local_part, server_name);
+                        let alias = RoomAliasId::parse(&alias).ok()?;
+                        let room_id = self_ref.room_id_from_alias(alias).await.ok()?;
+
+                        // Get hierarchy for this space
+                        let hierarchy = self_ref.client
+                            .send_request(get_hierarchy::v1::Request::new(room_id.clone()))
+                            .await.ok()?;
+
+                        let mut room_ids = vec![room_id];
+                        room_ids.extend(hierarchy.rooms.into_iter().map(|room| room.room_id));
+
+                        Some(room_ids)
+                    }
+                })
+                .collect();
+
+            let hierarchy_results = join_all(space_futures).await;
+
+            let mut unique_room_ids = HashSet::new();
+            for result in hierarchy_results {
+                if let Some(room_ids) = result {
+                    for room_id in room_ids {
+                        unique_room_ids.insert(room_id);
+                    }
+                }
+            }
+            all_room_ids.extend(unique_room_ids);
+
+
+            let state_futures: Vec<_> = all_room_ids
+                .into_iter()
+                .map(|room_id| {
+                    let sem = semaphore.clone();
+                    let self_ref = self;
+                    async move {
+                        let _permit = sem.acquire().await.ok()?;
+
+                        let st = self_ref.client
+                            .send_request(get_state_events::v3::Request::new(room_id.clone()))
+                            .await.ok()?;
+
+                        Some(JoinedRoomState {
+                            room_id,
+                            state: Some(st.room_state),
+                        })
+                    }
+                })
+                .collect();
+
+            let state_results = join_all(state_futures).await;
+            let joined_rooms: Vec<_> = state_results.into_iter().filter_map(|x| x).collect();
+
+            return Ok(Some(joined_rooms));
+        }
+
+        // Handle the non-curated case
+        let jr = self.client
+            .send_request(joined_rooms::v3::Request::new())
+            .await?;
+
+        if jr.joined_rooms.is_empty() {
+            return Ok(None);
+        }
+
+        let state_futures: Vec<_> = jr.joined_rooms
+            .into_iter()
+            .map(|room_id| {
+                let sem = semaphore.clone();
+                let self_ref = self;
+                async move {
+                    let _permit = sem.acquire().await.ok()?;
+
+                    let st = self_ref.client
+                        .send_request(get_state_events::v3::Request::new(room_id.clone()))
+                        .await.ok()?;
+
+                    Some(JoinedRoomState {
+                        room_id,
+                        state: Some(st.room_state),
+                    })
+                }
+            })
+            .collect();
+
+        let results = join_all(state_futures).await;
+        let joined_rooms: Vec<_> = results.into_iter().filter_map(|x| x).collect();
+
+        Ok(Some(joined_rooms))
+    }
+
+    pub async fn joined_rooms_state_alt(&self) -> Result<Option<Vec<JoinedRoomState>>, anyhow::Error> {
 
         let curated = self.config.public_rooms.curated;
         let include_rooms = &self.config.public_rooms.include_rooms;
@@ -445,7 +557,7 @@ impl AppService {
 
     pub async fn get_public_spaces(&self) -> Result<Option<Vec<RoomSummary>>, anyhow::Error> {
 
-        let mut spaces = Vec::new();
+        let semaphore = Arc::new(Semaphore::new(10)); 
 
         if self.config.spaces.include_all {
             let jr = self.client
@@ -456,34 +568,35 @@ impl AppService {
                 return Ok(None);
             }
 
-            for room_id in jr.joined_rooms {
 
-                // Check if the room is a space
-                let is_space = match self.is_space(room_id.clone()).await {
-                    Ok(is_space) => is_space,
-                    Err(_) => continue,
-                };
+            let space_futures: Vec<_> = jr.joined_rooms
+                .into_iter()
+                .map(|room_id| {
+                    let sem = semaphore.clone();
+                    let self_ref = self;
+                    async move {
+                        let _permit = sem.acquire().await.ok()?;
 
-                if !is_space {
-                    continue;
-                }
+                        let is_space = self_ref.is_space(room_id.clone()).await.ok()?;
+                        if !is_space {
+                            return None;
+                        }
 
-                let summary = match self.get_room_summary(room_id).await {
-                    Ok(summary) => summary,
-                    Err(_) => continue,
-                };
+                        let summary = self_ref.get_room_summary(room_id).await.ok()?;
+                        Some(summary)
+                    }
+                })
+                .collect();
 
-                spaces.push(summary);
-            }
+            let results = join_all(space_futures).await;
+            let spaces: Vec<_> = results.into_iter().filter_map(|x| x).collect();
 
             if spaces.is_empty() {
                 return Ok(None);
             }
 
             return Ok(Some(spaces));
-
         }
-
 
         let default_spaces = self.config.spaces.default.clone();
 
@@ -491,32 +604,31 @@ impl AppService {
             return Ok(None);
         }
 
-        for space in default_spaces {
+        let space_futures: Vec<_> = default_spaces
+            .into_iter()
+            .map(|space| {
+                let sem = semaphore.clone();
+                let server_name = self.config.matrix.server_name.clone();
+                let self_ref = self;
+                async move {
+                    let _permit = sem.acquire().await.ok()?;
 
-            let server_name = self.config.matrix.server_name.clone();
+                    let raw_alias = format!("#{}:{}", space, server_name);
 
-            let raw_alias = format!("#{}:{}", space, server_name);
+                    let alias = RoomAliasId::parse(&raw_alias).ok()?;
 
-            let alias = match RoomAliasId::parse(&raw_alias) {
-                Ok(alias) => alias,
-                Err(_) => continue,
-            };
+                    let room_id = self_ref.room_id_from_alias(alias).await.ok()?;
 
-            let room_id = match self.room_id_from_alias(alias).await {
-                Ok(room_id) => room_id,
-                Err(_) => continue,
-            };
+                    let summary = self_ref.get_room_summary(room_id).await.ok()?;
+                    Some(summary)
+                }
+            })
+            .collect();
 
-            let summary = match self.get_room_summary(room_id).await {
-                Ok(summary) => summary,
-                Err(_) => continue,
-            };
-
-            spaces.push(summary);
-        }
+        let results = join_all(space_futures).await;
+        let spaces: Vec<_> = results.into_iter().filter_map(|x| x).collect();
 
         Ok(Some(spaces))
-
     }
 
 }

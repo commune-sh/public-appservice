@@ -13,6 +13,7 @@ anyhow = "1.0.93"
 axum = "0.8.3"
 bytes = "1.10.1"
 clap = { version = "4.5.23", features = ["derive"] }
+futures = "0.3.31"
 http = "1.1.0"
 hyper = { version = "1.5.1", features = ["full"] }
 hyper-tls = "0.6.0"
