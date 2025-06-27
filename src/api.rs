@@ -110,7 +110,17 @@ pub async fn transactions(
             match public {
                 Some(true) => {
                     info!("Joining room: {}", room_id);
-                    let _ = state.appservice.join_room(room_id).await;
+                    let joined = state.appservice.join_room(room_id.clone()).await;
+                    // cache the joined status
+                    if let Ok(joined) = joined {
+                        let cache_key = format!("appservice:joined:{}", room_id);
+                        if let Ok(_) = state.cache.cache_data(&cache_key, &joined, 300).await {
+                            tracing::info!("Cached joined status for room: {}", room_id);
+                        } else {
+                            tracing::warn!("Failed to cache joined status for room: {}", room_id);
+                        
+                        }
+                    }
                 }
                 Some(false) => {
                     info!("Leaving room: {}", room_id);

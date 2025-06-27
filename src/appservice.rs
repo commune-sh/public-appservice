@@ -125,16 +125,17 @@ impl AppService {
         Ok(r)
     }
 
-    pub async fn join_room(&self, room_id: OwnedRoomId) -> Result<(), anyhow::Error>{
+    pub async fn join_room(&self, room_id: OwnedRoomId) -> Result<bool, anyhow::Error>{
 
         let jr = self.client
             .send_request(join_room_by_id::v3::Request::new(
-                room_id
+                room_id.clone()
             ))
             .await?;
 
         tracing::info!("Joined room: {:#?}", jr);
-        Ok(())
+
+        Ok(jr.room_id == room_id)
     }
 
     pub async fn has_joined_room(&self, room_id: OwnedRoomId) -> Result<bool, anyhow::Error> {
