@@ -6,7 +6,7 @@ license = "AGPL-3.0"
 authors = ["ChurchOfTheSubgenius <mail@hummingbard.com>"]
 keywords = ["matrix", "appservice", "public"]
 repository = "https://github.com/commune-sh/public-appservice"
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 anyhow = "1.0.93"
