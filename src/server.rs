@@ -144,9 +144,16 @@ impl Server {
             .merge(media_routes)
             .merge(public_rooms_route)
             .merge(admin_routes)
-            .merge(spaces_routes)
-            .merge(search_route)
-            .route("/version", get(version))
+            .merge(spaces_routes);
+
+        let app = if !self.state.config.search.disabled {
+            app.merge(search_route)
+        } else {
+            app
+        };
+
+
+        let app = app.route("/version", get(version))
             .route("/identity", get(identity))
             .route("/health", get(health))
             .route("/", get(index))
@@ -225,8 +232,15 @@ pub async fn health(
         state.config.matrix.server_name
     );
 
+    let search_disabled = state.config.search.disabled;
+
+    let features = json!({
+        "search_disabled": search_disabled,
+    });
+
     Ok(Json(json!({
         "status": "ok",
         "user_id": user,
+        "features": features,
     })))
 }

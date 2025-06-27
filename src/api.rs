@@ -380,9 +380,6 @@ pub async fn matrix_proxy_search(
         }
     }
 
-
-    println!("[DEBUG] Cache key: {}", cache_key);
-
     let mut request_builder = state.proxy
         .request(method, &target_url)
         .timeout(Duration::from_secs(25)) // Slightly less than overall timeout
