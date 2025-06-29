@@ -24,6 +24,10 @@ disabled = false
 directory = "logs"
 filename = "commune.log"
 
+[sentry]
+enabled = false
+dsn = ""
+
 [redis]
 url = "127.0.0.1:6379/0"
 pool_size = 20
