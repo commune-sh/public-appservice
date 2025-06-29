@@ -226,7 +226,10 @@ pub async fn validate_public_room(
         Err(_) => {
             let joined = state.appservice.has_joined_room(id)
                 .await
-                .map_err(|_| AppserviceError::AppserviceError("Failed to check room membership".to_string()))?;
+                .map_err(|e| {
+                    tracing::error!("Failed to check joined status for room {}: {}", room_id, e);
+                    return AppserviceError::AppserviceError("Failed to check joined status".to_string())
+            })?;
 
             if joined {
                 if let Ok(_) = state.cache.cache_data(&cache_key, &joined, 300).await {
