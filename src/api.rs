@@ -16,6 +16,7 @@ use ruma::events::room::{
     member::{RoomMemberEvent, MembershipState},
     history_visibility::{RoomHistoryVisibilityEvent, HistoryVisibility},
 };
+use ruma::events::space::child::SpaceChildEvent;
 
 use ruma::events::macros::EventContent;
 
@@ -72,6 +73,20 @@ pub async fn transactions(
 
                     return Ok(Json(json!({})))
                 }
+
+            }
+
+            if let Ok(event) = serde_json::from_value::<SpaceChildEvent>(event.clone()) {
+
+                tracing::info!("Auto joining space child room");
+
+                tokio::spawn(async move {
+                    let room_id = event.room_id().to_owned();
+                    info!("Joining room: {}", room_id);
+                    let _ = state.appservice.join_room(room_id).await;
+                });
+
+                return Ok(Json(json!({})))
 
             }
         };
