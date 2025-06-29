@@ -23,6 +23,8 @@ redis = { version = "0.27.5", features = ["tokio-comp"] }
 regex = "1.11.1"
 reqwest = { version = "0.12.9", features = ["json"] }
 ruma = { version = "0.12.3", features = ["appservice-api-c", "client-hyper-native-tls", "client-api-c", "client-ext-client-api"] }
+sentry = { version = "0.41.0", features = ["tracing"] }
+sentry-tracing = "0.41.0"
 serde = { version = "1.0.215", features = ["derive"] }
 serde_json = "1.0.133"
 sha2 = "0.10.9"
