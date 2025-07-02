@@ -318,6 +318,29 @@ fn process_rooms(
         public_rooms.push(pub_room);
     }
 
+    if _state.config.public_rooms.curated && !_state.config.public_rooms.include_rooms.is_empty() {
+
+        let mut include_rooms: Vec<String> = Vec::new();
+
+        for local_part in &_state.config.public_rooms.include_rooms {
+            let alias = format!("#{}:{}", local_part, _state.config.matrix.server_name);
+            include_rooms.push(alias);
+        }
+
+        // sort public_rooms by canonical_alias, comparing to the order or include_rooms
+
+        public_rooms.sort_by(|a, b| {
+            let a_alias = a.canonical_alias.clone().unwrap_or(String::new());
+            let b_alias = b.canonical_alias.clone().unwrap_or(String::new());
+
+            let a_index = include_rooms.iter().position(|x| x == &a_alias).unwrap_or(usize::MAX);
+            let b_index = include_rooms.iter().position(|x| x == &b_alias).unwrap_or(usize::MAX);
+
+            a_index.cmp(&b_index)
+        });
+
+    }
+
     public_rooms
 }
 
