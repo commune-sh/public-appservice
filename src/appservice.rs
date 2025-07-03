@@ -31,12 +31,16 @@ use serde::{Deserialize, Serialize};
 
 pub type HttpClient = ruma::client::http_client::HyperNativeTls;
 
+use std::sync::Mutex;
+
+
 #[derive(Clone)]
 pub struct AppService {
     client: ruma::Client<HttpClient>,
     config: Config,
     pub appservice_id: String,
     pub user_id: Box<OwnedUserId>,
+    pub joined_rooms: Arc<Mutex<Vec<OwnedRoomId>>>,
 }
 
 pub type RoomState = Vec<ruma::serde::Raw<AnyStateEvent>>;
@@ -67,12 +71,52 @@ impl AppService {
             std::process::exit(1);
         }
 
+        let joined_rooms = match client
+            .send_request(joined_rooms::v3::Request::new())
+        .await {
+            Ok(r) => r.joined_rooms,
+            Err(_) => vec![],
+        };
+
         Ok(Self {
             client,
             config: config.clone(),
             appservice_id: config.appservice.id.clone(),
             user_id: Box::new(user_id),
+            joined_rooms: Arc::new(Mutex::new(joined_rooms)),
         })
+    }
+
+    pub fn add_to_joined_rooms(&self, room_id: OwnedRoomId) -> Result<(), anyhow::Error> {
+        let mut rooms = self.joined_rooms
+            .lock()
+            .map_err(|_| anyhow::anyhow!("Failed to acquire lock on joined_rooms"))?;
+
+        if !rooms.contains(&room_id) {
+            rooms.push(room_id.clone());
+        }
+        tracing::info!(
+            "Added room {} to joined rooms. Current count: {}",
+            room_id,
+            rooms.len()
+        );
+        Ok(())
+    }
+
+    pub fn remove_from_joined_rooms(&self, room_id: &OwnedRoomId) -> Result<(), anyhow::Error> {
+        let mut rooms = self.joined_rooms
+            .lock()
+            .map_err(|_| anyhow::anyhow!("Failed to acquire lock on joined_rooms"))?;
+
+        if let Some(pos) = rooms.iter().position(|x| x == room_id) {
+            rooms.remove(pos);
+        }
+        tracing::info!(
+            "Removed room {} from joined rooms. Current count: {}",
+            room_id,
+            rooms.len()
+        );
+        Ok(())
     }
 
     pub async fn health_check(&self) -> Result<(), anyhow::Error> {
@@ -184,7 +228,7 @@ impl AppService {
         Ok(())
     }
 
-    pub async fn joined_rooms(&self) -> Result<Vec<ruma::OwnedRoomId>, anyhow::Error> {
+    pub async fn joined_rooms(&self) -> Result<Vec<OwnedRoomId>, anyhow::Error> {
         let jr = self
             .client
             .send_request(joined_rooms::v3::Request::new())

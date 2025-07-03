@@ -186,15 +186,24 @@ pub async fn transactions(
         match membership {
             MembershipState::Invite => {
                 info!("Joining room: {}", room_id);
-                let _ = state.appservice.join_room(room_id).await;
+                let _ = state.appservice.join_room(room_id.clone()).await;
+                if let Err(_) = state.appservice.add_to_joined_rooms(room_id.clone()) {
+                    tracing::warn!("Failed to add room to joined rooms list: {}", room_id);
+                }
             }
             MembershipState::Leave => {
-                let _ = state.appservice.leave_room(room_id).await;
+                let _ = state.appservice.leave_room(room_id.clone()).await;
+                if let Err(_) = state.appservice.remove_from_joined_rooms(&room_id) {
+                    tracing::warn!("Failed to remove room from joined rooms list: {}", room_id);
+                }
             }
             MembershipState::Ban => {
                 info!("Banned from room: {}", room_id);
-                let _ = state.appservice.leave_room(room_id).await;
+                let _ = state.appservice.leave_room(room_id.clone()).await;
                 //state.appservice.leave_room(room_id).await;
+                if let Err(_) = state.appservice.remove_from_joined_rooms(&room_id) {
+                    tracing::warn!("Failed to remove room from joined rooms list: {}", room_id);
+                }
             }
             _ => {}
         }
