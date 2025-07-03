@@ -1,4 +1,4 @@
 /target
 /logs
 config.toml
-*.config.toml
+*config.toml

@@ -1,15 +1,15 @@
-pub mod config;
-pub mod appservice;
-pub mod server;
-pub mod ping;
 pub mod api;
-pub mod space;
-pub mod rooms;
-pub mod middleware;
+pub mod appservice;
 pub mod cache;
+pub mod config;
 pub mod error;
-pub mod utils;
+pub mod middleware;
 pub mod oidc;
+pub mod ping;
+pub mod rooms;
+pub mod server;
+pub mod space;
+pub mod utils;
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -30,13 +30,12 @@ pub struct AppState {
 
 impl AppState {
     pub async fn new(config: config::Config) -> Result<Arc<Self>, anyhow::Error> {
-
         let client = Client::builder()
-            .timeout(Duration::from_secs(30)) 
-            .connect_timeout(Duration::from_secs(10)) 
-            .pool_max_idle_per_host(10) 
+            .timeout(Duration::from_secs(30))
+            .connect_timeout(Duration::from_secs(10))
+            .pool_max_idle_per_host(10)
             .pool_idle_timeout(Duration::from_secs(90))
-            .user_agent("commune-public-appservice") 
+            .user_agent("commune-public-appservice")
             .build()?;
 
         let appservice = appservice::AppService::new(&config).await?;
@@ -46,7 +45,6 @@ impl AppState {
         let transaction_store = ping::TransactionStore::new();
 
         let oidc = oidc::get_auth_metadata(&config.matrix.homeserver).await?;
-
 
         Ok(Arc::new(Self {
             config,
@@ -74,4 +72,3 @@ impl Args {
         Args::parse()
     }
 }
-

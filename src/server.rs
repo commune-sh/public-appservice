@@ -1,81 +1,67 @@
 use axum::{
-    middleware::{self},
-    routing::{get, put, post},
-    http::HeaderValue,
+    Json, Router, ServiceExt,
     extract::{Request, State},
-    Router,
-    ServiceExt,
+    http::HeaderValue,
+    middleware::{self},
     response::IntoResponse,
-    Json,
+    routing::{get, post, put},
 };
 
 use std::sync::Arc;
 use tracing::info;
 
-use tower_http::cors::{Any, CorsLayer};
-use tower_http::trace::TraceLayer;
-use tower_http::normalize_path::NormalizePathLayer;
 use tower::Layer;
+use tower_http::cors::{Any, CorsLayer};
+use tower_http::normalize_path::NormalizePathLayer;
+use tower_http::trace::TraceLayer;
 
 use serde_json::json;
 
-
 use http::header::CONTENT_TYPE;
 
-use anyhow;
 use crate::error::AppserviceError;
+use anyhow;
 
 use crate::config::Config;
-use crate::rooms::{public_rooms, room_info, join_room, leave_room};
 use crate::middleware::{
-    is_admin,
-    authenticate_homeserver,
-    validate_public_room,
-    validate_room_id,
-    add_data
+    add_data, authenticate_homeserver, is_admin, validate_public_room, validate_room_id,
 };
+use crate::rooms::{join_room, leave_room, public_rooms, room_info};
 
 use crate::ping::ping;
 
-use crate::api::{
-    transactions,
-    matrix_proxy,
-    matrix_proxy_search
-};
+use crate::api::{matrix_proxy, matrix_proxy_search, transactions};
 
-use crate::space::{
-    space,
-    spaces,
-    space_rooms
-};
+use crate::space::{space, space_rooms, spaces};
 
-pub struct Server{
+pub struct Server {
     state: Arc<AppState>,
 }
 
 pub use crate::AppState;
 
 impl Server {
-
     pub fn new(state: Arc<AppState>) -> Self {
-        Self {
-            state
-        }
+        Self { state }
     }
 
     pub fn setup_cors(&self, config: &Config) -> CorsLayer {
-
         let mut layer = CorsLayer::new()
             .allow_origin(Any)
             .allow_headers(vec![CONTENT_TYPE]);
 
         layer = match &config.server.allow_origin {
-            Some(origins) if !origins.is_empty() && 
-            !origins.contains(&"".to_string()) &&
-            !origins.contains(&"*".to_string()) => {
-                let origins = origins.iter().filter_map(|s| s.parse::<HeaderValue>().ok()).collect::<Vec<_>>();
+            Some(origins)
+                if !origins.is_empty()
+                    && !origins.contains(&"".to_string())
+                    && !origins.contains(&"*".to_string()) =>
+            {
+                let origins = origins
+                    .iter()
+                    .filter_map(|s| s.parse::<HeaderValue>().ok())
+                    .collect::<Vec<_>>();
                 layer.allow_origin(origins)
-            },
+            }
             _ => layer,
         };
 
@@ -90,7 +76,10 @@ impl Server {
         let service_routes = Router::new()
             .route("/_matrix/app/v1/ping", post(ping))
             .route("/_matrix/app/v1/transactions/{txn_id}", put(transactions))
-            .route_layer(middleware::from_fn_with_state(self.state.clone(), authenticate_homeserver));
+            .route_layer(middleware::from_fn_with_state(
+                self.state.clone(),
+                authenticate_homeserver,
+            ));
 
         let room_routes_inner = Router::new()
             .route("/state", get(matrix_proxy))
@@ -108,23 +97,49 @@ impl Server {
 
         let room_routes = Router::new()
             .nest("/_matrix/client/v3/rooms/{room_id}", room_routes_inner)
-            .route_layer(middleware::from_fn_with_state(self.state.clone(), validate_public_room))
-            .route_layer(middleware::from_fn_with_state(self.state.clone(), validate_room_id));
+            .route_layer(middleware::from_fn_with_state(
+                self.state.clone(),
+                validate_public_room,
+            ))
+            .route_layer(middleware::from_fn_with_state(
+                self.state.clone(),
+                validate_room_id,
+            ));
 
         let more_room_routes = Router::new()
-            .route("/_matrix/client/v1/rooms/{room_id}/hierarchy", get(matrix_proxy))
-            .route("/_matrix/client/v1/rooms/{room_id}/threads", get(matrix_proxy))
-            .route("/_matrix/client/v1/rooms/{room_id}/relations/{*path}", get(matrix_proxy))
-            .route_layer(middleware::from_fn_with_state(self.state.clone(), validate_public_room))
-            .route_layer(middleware::from_fn_with_state(self.state.clone(), validate_room_id));
+            .route(
+                "/_matrix/client/v1/rooms/{room_id}/hierarchy",
+                get(matrix_proxy),
+            )
+            .route(
+                "/_matrix/client/v1/rooms/{room_id}/threads",
+                get(matrix_proxy),
+            )
+            .route(
+                "/_matrix/client/v1/rooms/{room_id}/relations/{*path}",
+                get(matrix_proxy),
+            )
+            .route_layer(middleware::from_fn_with_state(
+                self.state.clone(),
+                validate_public_room,
+            ))
+            .route_layer(middleware::from_fn_with_state(
+                self.state.clone(),
+                validate_room_id,
+            ));
 
-        let public_rooms_route = Router::new()
-            .route("/publicRooms", get(public_rooms));
+        let public_rooms_route = Router::new().route("/publicRooms", get(public_rooms));
 
         let media_routes = Router::new()
             .route("/_matrix/client/v1/media/preview_url", get(matrix_proxy))
-            .route("/_matrix/client/v1/media/thumbnail/{*path}", get(matrix_proxy))
-            .route("/_matrix/client/v1/media/download/{*path}", get(matrix_proxy));
+            .route(
+                "/_matrix/client/v1/media/thumbnail/{*path}",
+                get(matrix_proxy),
+            )
+            .route(
+                "/_matrix/client/v1/media/download/{*path}",
+                get(matrix_proxy),
+            );
 
         let admin_routes = Router::new()
             .route("/admin/room/{room_id}/join", put(join_room))
@@ -136,8 +151,8 @@ impl Server {
             .route("/spaces/{space}", get(space))
             .route("/spaces", get(spaces));
 
-        let search_route = Router::new()
-            .route("/_matrix/client/v3/search", post(matrix_proxy_search));
+        let search_route =
+            Router::new().route("/_matrix/client/v3/search", post(matrix_proxy_search));
 
         let app = Router::new()
             .merge(service_routes)
@@ -154,8 +169,8 @@ impl Server {
             app
         };
 
-
-        let app = app.route("/version", get(version))
+        let app = app
+            .route("/version", get(version))
             .route("/identity", get(identity))
             .route("/health", get(health))
             .route("/", get(index))
@@ -164,9 +179,7 @@ impl Server {
             .layer(TraceLayer::new_for_http())
             .with_state(self.state.clone());
 
-        let app = NormalizePathLayer::trim_trailing_slash()
-            .layer(app);
-
+        let app = NormalizePathLayer::trim_trailing_slash().layer(app);
 
         tokio::spawn(async move {
             info!("Pinging homeserver...");
@@ -193,9 +206,7 @@ async fn index() -> &'static str {
     "Commune public appservice.\n"
 }
 
-pub async fn version(
-) -> Result<impl IntoResponse, ()> {
-
+pub async fn version() -> Result<impl IntoResponse, ()> {
     let version = env!("CARGO_PKG_VERSION");
     let hash = env!("GIT_COMMIT_HASH");
 
@@ -205,15 +216,10 @@ pub async fn version(
     })))
 }
 
-
-pub async fn identity(
-    State(state): State<Arc<AppState>>,
-) -> Result<impl IntoResponse, ()> {
-
+pub async fn identity(State(state): State<Arc<AppState>>) -> Result<impl IntoResponse, ()> {
     let user = format!(
-        "@{}:{}", 
-        state.config.appservice.sender_localpart, 
-        state.config.matrix.server_name
+        "@{}:{}",
+        state.config.appservice.sender_localpart, state.config.matrix.server_name
     );
 
     Ok(Json(json!({
@@ -224,14 +230,15 @@ pub async fn identity(
 pub async fn health(
     State(state): State<Arc<AppState>>,
 ) -> Result<impl IntoResponse, AppserviceError> {
-
-    let _ = state.appservice.health_check().await
+    let _ = state
+        .appservice
+        .health_check()
+        .await
         .map_err(|_| AppserviceError::AppserviceError("Health check failed".to_string()))?;
 
     let user = format!(
-        "@{}:{}", 
-        state.config.appservice.sender_localpart, 
-        state.config.matrix.server_name
+        "@{}:{}",
+        state.config.appservice.sender_localpart, state.config.matrix.server_name
     );
 
     let search_disabled = state.config.search.disabled;

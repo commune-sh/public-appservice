@@ -1,14 +1,11 @@
 use crate::config::Config;
 
-use redis::{
-    AsyncCommands,
-    RedisError
-};
+use redis::{AsyncCommands, RedisError};
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
-use crate::rooms::PublicRoom;
 use crate::appservice::RoomSummary;
+use crate::rooms::PublicRoom;
 
 #[derive(Debug, Clone)]
 pub struct Cache {
@@ -16,14 +13,11 @@ pub struct Cache {
 }
 
 impl Cache {
-
     pub async fn new(config: &Config) -> Result<Self, anyhow::Error> {
-
         let url = format!("redis://{}", config.redis.url);
         let client = redis::Client::open(url)?;
 
         Ok(Self { client })
-
     }
 
     pub async fn cache_data<T>(&self, key: &str, data: &T, ttl: u64) -> Result<(), RedisError>
@@ -64,14 +58,8 @@ impl Cache {
         conn.del(key).await
     }
 
-    pub async fn cache_rooms(
-        &self,
-        rooms: &Vec<PublicRoom>,
-        ttl: u64,
-    ) -> Result<(), RedisError> {
-
+    pub async fn cache_rooms(&self, rooms: &Vec<PublicRoom>, ttl: u64) -> Result<(), RedisError> {
         self.cache_data("public_rooms", rooms, ttl).await
-
     }
 
     pub async fn get_cached_rooms(&self) -> Result<Vec<PublicRoom>, RedisError> {
@@ -82,10 +70,8 @@ impl Cache {
         &self,
         room_id: &str,
     ) -> Result<Vec<PublicRoom>, RedisError> {
-
         let key = format!("room_state:{}", room_id);
         self.get_cached_data(&key).await
-
     }
 
     pub async fn cache_public_spaces(
@@ -100,35 +86,27 @@ impl Cache {
         self.get_cached_data("public_spaces").await
     }
 
-
     pub async fn cache_room_state(
         &self,
         room_id: &str,
         state: &Vec<PublicRoom>,
         ttl: u64,
     ) -> Result<(), RedisError> {
-
         let key = format!("room_state:{}", room_id);
         self.cache_data(&key, state, ttl).await
-
     }
 
     pub async fn cache_proxy_response(
-        &self, 
-        key: &str, 
-        data: &[u8], 
-        ttl: u64
+        &self,
+        key: &str,
+        data: &[u8],
+        ttl: u64,
     ) -> Result<(), RedisError> {
-
         let mut conn = self.client.get_multiplexed_tokio_connection().await?;
         conn.set_ex(key, data, ttl).await
     }
 
-    pub async fn get_cached_proxy_response(
-        &self, 
-        key: &str
-    ) -> Result<Vec<u8>, RedisError> {
-
+    pub async fn get_cached_proxy_response(&self, key: &str) -> Result<Vec<u8>, RedisError> {
         let mut conn = self.client.get_multiplexed_tokio_connection().await?;
 
         // check if the key exists
@@ -141,5 +119,4 @@ impl Cache {
 
         conn.get(key).await
     }
-
 }

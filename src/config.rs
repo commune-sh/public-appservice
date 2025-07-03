@@ -1,6 +1,6 @@
-use serde::{Serialize, Deserialize};
-use std::{fs, process};
+use serde::{Deserialize, Serialize};
 use std::path::Path;
+use std::{fs, process};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
@@ -218,7 +218,7 @@ fn default_timeout_secs() -> u64 {
 }
 
 fn default_cache_ttl() -> u64 {
-    300 
+    300
 }
 
 fn default_spaces_ttl() -> u64 {
@@ -245,7 +245,6 @@ impl Config {
             }
         }
     }
-
 }
 
 #[cfg(test)]
@@ -267,7 +266,7 @@ mod tests {
         "#;
 
         let config: Config = toml::from_str(toml_content).expect("Should parse minimal config");
-        
+
         assert_eq!(config.server.port, 8989);
         assert_eq!(config.redis.pool_size, 10);
         assert!(!config.cache.requests.enabled);

@@ -1,31 +1,25 @@
 use axum::{
-    extract::{State, OriginalUri},
-    http::{
-        Request, 
-        Response, 
-        StatusCode, 
-        HeaderMap
-    },
+    Extension, Json,
     body::Body,
-    Json,
-    Extension,
+    extract::{OriginalUri, State},
+    http::{HeaderMap, Request, Response, StatusCode},
 };
 
-use std::time::Duration;
 use ruma::events::room::{
-    member::{RoomMemberEvent, MembershipState},
-    history_visibility::{RoomHistoryVisibilityEvent, HistoryVisibility},
+    history_visibility::{HistoryVisibility, RoomHistoryVisibilityEvent},
+    member::{MembershipState, RoomMemberEvent},
 };
 use ruma::events::space::child::SpaceChildEvent;
+use std::time::Duration;
 
 use ruma::events::macros::EventContent;
 
-use serde_json::{Value, json};
 use serde::{Deserialize, Serialize};
+use serde_json::{Value, json};
 use std::sync::Arc;
 use tracing::info;
 
-use sha2::{Sha256, Digest};
+use sha2::{Digest, Sha256};
 
 use crate::AppState;
 use crate::middleware::Data;
@@ -40,12 +34,11 @@ pub async fn transactions(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<Value>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
-
     let events = match payload.get("events") {
         Some(Value::Array(events)) => events,
         Some(_) | None => {
             tracing::info!("Events is not an array");
-            return Ok(Json(json!({})))
+            return Ok(Json(json!({})));
         }
     };
 
@@ -57,7 +50,6 @@ pub async fn transactions(
         // If auto-join is enabled, join rooms with world_readable history visibility
         if state.config.appservice.rules.auto_join {
             if let Ok(event) = serde_json::from_value::<RoomHistoryVisibilityEvent>(event.clone()) {
-
                 if event.history_visibility() == &HistoryVisibility::WorldReadable {
                     tracing::info!("History Visibility: World Readable");
 
@@ -71,13 +63,11 @@ pub async fn transactions(
                         let _ = state.appservice.join_room(room_id).await;
                     });
 
-                    return Ok(Json(json!({})))
+                    return Ok(Json(json!({})));
                 }
-
             }
 
             if let Ok(event) = serde_json::from_value::<SpaceChildEvent>(event.clone()) {
-
                 tracing::info!("Auto joining space child room");
 
                 tokio::spawn(async move {
@@ -86,8 +76,7 @@ pub async fn transactions(
                     let _ = state.appservice.join_room(room_id).await;
                 });
 
-                return Ok(Json(json!({})))
-
+                return Ok(Json(json!({})));
             }
         };
 
@@ -133,7 +122,6 @@ pub async fn transactions(
                             tracing::info!("Cached joined status for room: {}", room_id);
                         } else {
                             tracing::warn!("Failed to cache joined status for room: {}", room_id);
-                        
                         }
                     }
                 }
@@ -147,12 +135,12 @@ pub async fn transactions(
             }
         };
 
-
-        let member_event = if let Ok(event) = serde_json::from_value::<RoomMemberEvent>(event.clone()) {
-            event
-        } else {
-            continue;
-        };
+        let member_event =
+            if let Ok(event) = serde_json::from_value::<RoomMemberEvent>(event.clone()) {
+                event
+            } else {
+                continue;
+            };
 
         print!("Member Event: {:#?}", member_event);
 
@@ -162,17 +150,22 @@ pub async fn transactions(
 
         match server_name {
             Some(server_name) => {
-
-                let allowed = state.config.appservice.rules.federation_domain_whitelist.iter().any(|domain| {
-                    server_name.as_str().ends_with(domain)
-                });
-
+                let allowed = state
+                    .config
+                    .appservice
+                    .rules
+                    .federation_domain_whitelist
+                    .iter()
+                    .any(|domain| server_name.as_str().ends_with(domain));
 
                 if server_name.as_str() != state.config.matrix.server_name && allowed {
                     // Ignore events for rooms on other servers, if configured to local homeserver
                     // users
                     if state.config.appservice.rules.invite_by_local_user {
-                        info!("Ignoring event for room on different server: {}", server_name);
+                        info!(
+                            "Ignoring event for room on different server: {}",
+                            server_name
+                        );
                         continue;
                     }
                 }
@@ -205,10 +198,7 @@ pub async fn transactions(
             }
             _ => {}
         }
-
-
     }
-
 
     Ok(Json(json!({})))
 }
@@ -218,12 +208,11 @@ pub async fn matrix_proxy(
     State(state): State<Arc<AppState>>,
     req: Request<Body>,
 ) -> Result<Response<Body>, StatusCode> {
-
     let is_media_request = data.is_media_request;
 
     let method = req.method().clone();
     let headers = req.headers().clone();
-    
+
     let path = if let Some(mod_path) = data.modified_path.as_ref() {
         mod_path.as_str()
     } else if let Some(original_uri) = req.extensions().get::<OriginalUri>() {
@@ -233,14 +222,13 @@ pub async fn matrix_proxy(
     };
 
     let mut target_url = format!("{}{}", state.config.matrix.homeserver, path);
-    
+
     if data.modified_path.is_none() {
         if let Some(query) = req.uri().query() {
             target_url.push('?');
             target_url.push_str(query);
         }
     }
-
 
     let cache_key = format!("proxy_request:{}", target_url.clone());
     // check if response is cached and return it if so
@@ -254,14 +242,12 @@ pub async fn matrix_proxy(
                 .body(axum::body::Body::from(cached_response))
                 .map_err(|e| {
                     tracing::error!("Failed to build response: {}", e);
-                }) {
-
+                })
+            {
                 return Ok(response);
             }
-
         }
     }
-
 
     let body_bytes = match axum::body::to_bytes(req.into_body(), usize::MAX).await {
         Ok(bytes) => bytes,
@@ -270,7 +256,8 @@ pub async fn matrix_proxy(
         }
     };
 
-    let mut request_builder = state.proxy
+    let mut request_builder = state
+        .proxy
         .request(method, &target_url)
         .timeout(Duration::from_secs(25)) // Slightly less than overall timeout
         .bearer_auth(&state.config.appservice.access_token);
@@ -288,13 +275,15 @@ pub async fn matrix_proxy(
         request_builder = request_builder.body(body_bytes);
     }
 
-    let response = request_builder.send()
+    let response = request_builder
+        .send()
         .await
         .map_err(|_| StatusCode::BAD_REQUEST)?;
 
     let status = response.status();
     let headers = response.headers().clone();
-    let body = response.bytes()
+    let body = response
+        .bytes()
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
@@ -303,18 +292,17 @@ pub async fn matrix_proxy(
 
     if state.config.cache.requests.enabled && !is_media_request {
         tokio::spawn(async move {
-            if let Ok(_) = state.cache.cache_proxy_response(
-                &cache_key,
-                &to_cache,
-                ttl
-            ).await {
+            if let Ok(_) = state
+                .cache
+                .cache_proxy_response(&cache_key, &to_cache, ttl)
+                .await
+            {
                 tracing::info!("Cached proxied response for {}", target_url);
             } else {
                 tracing::warn!("Failed to cache proxied response for {}", target_url);
             }
         });
     }
-
 
     let mut axum_response = Response::builder().status(status);
 
@@ -334,16 +322,14 @@ pub async fn matrix_proxy(
     Ok(response)
 }
 
-
 pub async fn matrix_proxy_search(
     Extension(data): Extension<Data>,
     State(state): State<Arc<AppState>>,
     req: Request<Body>,
 ) -> Result<Response<Body>, StatusCode> {
-
     let method = req.method().clone();
     let headers = req.headers().clone();
-    
+
     let path = if let Some(mod_path) = data.modified_path.as_ref() {
         mod_path.as_str()
     } else if let Some(original_uri) = req.extensions().get::<OriginalUri>() {
@@ -353,7 +339,7 @@ pub async fn matrix_proxy_search(
     };
 
     let mut target_url = format!("{}{}", state.config.matrix.homeserver, path);
-    
+
     if data.modified_path.is_none() {
         if let Some(query) = req.uri().query() {
             target_url.push('?');
@@ -374,7 +360,7 @@ pub async fn matrix_proxy_search(
         let body_hash = format!("{:x}", hasher.finalize());
         format!("proxy_post_request:{}:{}", target_url, body_hash)
     } else {
-        String::new() 
+        String::new()
     };
 
     if state.config.cache.search.enabled {
@@ -387,15 +373,15 @@ pub async fn matrix_proxy_search(
                 .body(axum::body::Body::from(cached_response))
                 .map_err(|e| {
                     tracing::error!("Failed to build response: {}", e);
-                }) {
-
+                })
+            {
                 return Ok(response);
             }
-
         }
     }
 
-    let mut request_builder = state.proxy
+    let mut request_builder = state
+        .proxy
         .request(method, &target_url)
         .timeout(Duration::from_secs(25)) // Slightly less than overall timeout
         .bearer_auth(&state.config.appservice.access_token);
@@ -413,34 +399,34 @@ pub async fn matrix_proxy_search(
         request_builder = request_builder.body(body_bytes);
     }
 
-    let response = request_builder.send()
+    let response = request_builder
+        .send()
         .await
         .map_err(|_| StatusCode::BAD_REQUEST)?;
 
     let status = response.status();
     let headers = response.headers().clone();
-    let body = response.bytes()
+    let body = response
+        .bytes()
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
 
     let to_cache = body.to_vec();
     let ttl = state.config.cache.search.expire_after;
 
     if state.config.cache.search.enabled {
         tokio::spawn(async move {
-            if let Ok(_) = state.cache.cache_proxy_response(
-                &cache_key,
-                &to_cache,
-                ttl
-            ).await {
+            if let Ok(_) = state
+                .cache
+                .cache_proxy_response(&cache_key, &to_cache, ttl)
+                .await
+            {
                 tracing::info!("Cached proxied search response for {}", target_url);
             } else {
                 tracing::warn!("Failed to cache search response for {}", target_url);
             }
         });
     }
-
 
     let mut axum_response = Response::builder().status(status);
 
@@ -460,11 +446,16 @@ pub async fn matrix_proxy_search(
     Ok(response)
 }
 
-
 fn is_hop_by_hop_header(name: &str) -> bool {
-    matches!(name.to_lowercase().as_str(),
-        "connection" | "keep-alive" | "proxy-authenticate" | 
-        "proxy-authorization" | "te" | "trailers" | "transfer-encoding" | "upgrade"
+    matches!(
+        name.to_lowercase().as_str(),
+        "connection"
+            | "keep-alive"
+            | "proxy-authenticate"
+            | "proxy-authorization"
+            | "te"
+            | "trailers"
+            | "transfer-encoding"
+            | "upgrade"
     )
 }
-

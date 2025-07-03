@@ -1,12 +1,11 @@
-use thiserror::Error;
 use serde_json::json;
+use thiserror::Error;
 
 use axum::{
     Json,
-    response::{IntoResponse, Response},
     http::StatusCode,
+    response::{IntoResponse, Response},
 };
-
 
 #[derive(Error, Debug)]
 pub enum AppserviceError {
@@ -30,10 +29,8 @@ impl IntoResponse for AppserviceError {
             AppserviceError::MatrixError(_) => (StatusCode::NOT_FOUND, self.to_string()),
             AppserviceError::EventNotFound(_) => (StatusCode::NOT_FOUND, self.to_string()),
             AppserviceError::IncorrectHSToken => (StatusCode::UNAUTHORIZED, self.to_string()),
-
         };
 
         (status, Json(json!({ "error": message }))).into_response()
     }
 }
-
