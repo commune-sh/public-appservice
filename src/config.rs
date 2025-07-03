@@ -2,8 +2,6 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::{fs, process};
 
-use crate::log::LoggingConfig;
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
     #[serde(default)]
@@ -18,7 +16,7 @@ pub struct Config {
     pub public_rooms: PublicRooms,
     #[serde(default)]
     pub spaces: Spaces,
-    pub logging: LoggingConfig,
+    pub logging: Option<Logging>,
     #[serde(default)]
     pub search: Search,
 }
@@ -182,6 +180,12 @@ impl Default for Spaces {
             ttl: default_spaces_ttl(),
         }
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Logging {
+    pub directory: String,
+    pub filename: String,
 }
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
