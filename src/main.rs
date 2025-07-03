@@ -6,31 +6,32 @@ use tracing::info;
 
 use crate::AppState;
 
+use anyhow::Context;
+
+
 use log::{
     setup_sentry,
     setup_tracing,
 };
 
 #[tokio::main]
-async fn main() {
+async fn main() -> anyhow::Result<()> {
     let args = Args::build();
-
     let config = Config::new(&args.config);
-
+    
     let _sentry_guard = setup_sentry(&config);
-
     let _logging_guard = setup_tracing(&config);
 
-    let state = AppState::new(config.clone()).await.unwrap_or_else(|e| {
-        tracing::info!("Failed to initialize state: {}", e);
-        std::process::exit(1);
-    });
+    let state = AppState::new(config.clone())
+        .await
+        .context("Failed to initialize application state")?;
 
     info!("Starting Commune public appservice...");
 
-    Server::new(state).run().await.unwrap_or_else(|e| {
-        tracing::info!("Server error: {}", e);
-        std::process::exit(1);
-    });
-}
+    Server::new(state)
+        .run()
+        .await
+        .context("Server encountered an error")?;
 
+    Ok(())
+}
