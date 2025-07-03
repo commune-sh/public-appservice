@@ -19,7 +19,6 @@ pub struct Config {
     pub logging: Option<Logging>,
     #[serde(default)]
     pub search: Search,
-    pub sentry: Option<Sentry>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -187,12 +186,6 @@ impl Default for Spaces {
 pub struct Logging {
     pub directory: String,
     pub filename: String,
-}
-
-#[derive(Default, Debug, Clone, Serialize, Deserialize)]
-pub struct Sentry {
-    pub enabled: bool,
-    pub dsn: String,
 }
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
