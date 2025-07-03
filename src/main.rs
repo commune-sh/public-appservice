@@ -6,13 +6,18 @@ use tracing::info;
 
 use crate::AppState;
 
-use log::setup_tracing;
+use log::{
+    setup_sentry,
+    setup_tracing,
+};
 
 #[tokio::main]
 async fn main() {
     let args = Args::build();
 
     let config = Config::new(&args.config);
+
+    let _sentry_guard = setup_sentry(&config);
 
     let _logging_guard = setup_tracing(&config);
 

@@ -1,6 +1,34 @@
 use crate::config::Config;
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use sentry::ClientInitGuard;
+use sentry_tracing::EventFilter;
+
+pub fn setup_sentry(config: &Config) -> Option<ClientInitGuard> {
+    match config.sentry {
+        Some(ref sentry_config) => {
+            if sentry_config.enabled && sentry_config.dsn != "" {
+                let dsn = sentry_config.dsn.clone();
+                tracing::info!("Sentry is enabled with DSN.");
+                let guard = sentry::init((
+                    dsn,
+                    sentry::ClientOptions {
+                        release: sentry::release_name!(),
+                        traces_sample_rate: 1.0,
+                        debug: true,
+                        ..Default::default()
+                    },
+                ));
+                Some(guard)
+            } else {
+                None
+            }
+        },
+        None => {
+            None
+        }
+    }
+}
 
 pub fn setup_tracing(config: &Config) -> WorkerGuard {
     let env_filter = if cfg!(debug_assertions) {
@@ -37,6 +65,12 @@ pub fn setup_tracing(config: &Config) -> WorkerGuard {
         .with_ansi(false);
 
     tracing_subscriber::registry()
+        .with(sentry_tracing::layer().event_filter(|md| match md.level() {
+            &tracing::Level::ERROR => EventFilter::Breadcrumb,
+            &tracing::Level::INFO => EventFilter::Event,
+            &tracing::Level::WARN => EventFilter::Event,
+            _ => EventFilter::Ignore,
+        }))
         .with(tracing_subscriber::EnvFilter::new(env_filter))
         .with(console_layer)
         .with(file_layer)
