@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::path::Path;
-use std::{fs, process};
+use std::fs;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
@@ -235,24 +235,14 @@ fn default_spaces_ttl() -> u64 {
 }
 
 impl Config {
-    pub fn new(path: impl AsRef<Path>) -> Self {
+    pub fn new(path: impl AsRef<Path>) -> Result<Self, anyhow::Error> {
         let path = path.as_ref();
 
-        let config_content = match fs::read_to_string(path) {
-            Ok(content) => content,
-            Err(e) => {
-                tracing::error!("Failed to read config file at {}: {}", path.display(), e);
-                process::exit(1);
-            }
-        };
+        let config_content = fs::read_to_string(path)?;
 
-        match toml::from_str(&config_content) {
-            Ok(config) => config,
-            Err(e) => {
-                tracing::error!("Failed to parse config file: {}", e);
-                process::exit(1);
-            }
-        }
+        let config = toml::from_str(&config_content)?;
+
+        Ok(config)
     }
 }
 

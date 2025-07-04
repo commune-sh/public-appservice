@@ -18,7 +18,7 @@ use log::{
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let args = Args::build();
-    let config = Config::new(&args.config);
+    let config = Config::new(&args.config)?;
     
     let _sentry_guard = setup_sentry(&config);
     let _logging_guard = setup_tracing(&config);
