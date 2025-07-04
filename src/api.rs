@@ -287,7 +287,7 @@ pub async fn matrix_proxy(
     let response = request_builder
         .send()
         .await
-        .map_err(|_| StatusCode::BAD_REQUEST)?;
+        .map_err(|_| StatusCode::BAD_GATEWAY)?;
 
     let status = response.status();
     let headers = response.headers().clone();
@@ -411,7 +411,7 @@ pub async fn matrix_proxy_search(
     let response = request_builder
         .send()
         .await
-        .map_err(|_| StatusCode::BAD_REQUEST)?;
+        .map_err(|_| StatusCode::BAD_GATEWAY)?;
 
     let status = response.status();
     let headers = response.headers().clone();

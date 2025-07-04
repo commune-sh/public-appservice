@@ -234,7 +234,7 @@ pub async fn health(
         .appservice
         .health_check()
         .await
-        .map_err(|_| AppserviceError::AppserviceError("Health check failed".to_string()))?;
+        .map_err(|_| AppserviceError::HomeserverError("Health check failed. Could not reach homeserver.".to_string()))?;
 
     let user = format!(
         "@{}:{}",

@@ -11,14 +11,10 @@ use axum::{
 pub enum AppserviceError {
     #[error("{0}")]
     AppserviceError(String),
-    #[error("Homeserver unreachable: {0}")]
+    #[error("Homeserver error: {0}")]
     HomeserverError(String),
     #[error("Matrix API error: {0}")]
     MatrixError(String),
-    #[error("Event not found: {0}")]
-    EventNotFound(String),
-    #[error("M_FORBIDDEN")]
-    IncorrectHSToken,
 }
 
 impl IntoResponse for AppserviceError {
@@ -27,8 +23,6 @@ impl IntoResponse for AppserviceError {
             AppserviceError::AppserviceError(_) => (StatusCode::NOT_FOUND, self.to_string()),
             AppserviceError::HomeserverError(_) => (StatusCode::BAD_GATEWAY, self.to_string()),
             AppserviceError::MatrixError(_) => (StatusCode::NOT_FOUND, self.to_string()),
-            AppserviceError::EventNotFound(_) => (StatusCode::NOT_FOUND, self.to_string()),
-            AppserviceError::IncorrectHSToken => (StatusCode::UNAUTHORIZED, self.to_string()),
         };
 
         (status, Json(json!({ "error": message }))).into_response()
