@@ -12,7 +12,7 @@ fn main() {
         })
         .unwrap_or_else(|_| "unknown".to_string());
 
-    println!("cargo:rustc-env=GIT_COMMIT_HASH={}", git_hash);
+    println!("cargo:rustc-env=GIT_COMMIT_HASH={git_hash}");
 
     println!("cargo:rerun-if-changed=.git/HEAD");
 }

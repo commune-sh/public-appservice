@@ -319,8 +319,8 @@ fn process_rooms(_state: Arc<AppState>, rooms: Vec<JoinedRoomState>) -> Vec<Publ
         // sort public_rooms by canonical_alias, comparing to the order or include_rooms
 
         public_rooms.sort_by(|a, b| {
-            let a_alias = a.canonical_alias.clone().unwrap_or(String::new());
-            let b_alias = b.canonical_alias.clone().unwrap_or(String::new());
+            let a_alias = a.canonical_alias.clone().unwrap_or_default();
+            let b_alias = b.canonical_alias.clone().unwrap_or_default();
 
             let a_index = include_rooms
                 .iter()

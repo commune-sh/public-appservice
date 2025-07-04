@@ -11,10 +11,7 @@ pub struct AuthMetadata {
 }
 
 pub async fn get_auth_metadata(homeserver: &str) -> Result<AuthMetadata, anyhow::Error> {
-    let url = format!(
-        "{}/_matrix/client/unstable/org.matrix.msc2965/auth_metadata",
-        homeserver
-    );
+    let url = format!("{homeserver}/_matrix/client/unstable/org.matrix.msc2965/auth_metadata");
 
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(5))
@@ -25,12 +22,14 @@ pub async fn get_auth_metadata(homeserver: &str) -> Result<AuthMetadata, anyhow:
         .get(&url)
         .send()
         .await
-        .map_err(|_| anyhow::anyhow!("Failed to query auth metadata: {}", url))?;
+        .map_err(|e| {
+            anyhow::anyhow!("Failed to fetch auth metadata from {}: {}", url, e)
+        })?;
 
     let metadata = response
         .json::<AuthMetadata>()
         .await
-        .map_err(|_| anyhow::anyhow!("Failed to parse metadata."))?;
+        .map_err(|e| anyhow::anyhow!("Failed to parse metadata: {}", e))?;
 
     Ok(metadata)
 }

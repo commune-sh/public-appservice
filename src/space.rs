@@ -27,7 +27,7 @@ pub async fn spaces(
 
     // Return from cache if enabled and available
     if state.config.spaces.cache {
-        if let Some(cached_spaces) = state.cache.get_cached_public_spaces().await.ok() {
+        if let Ok(cached_spaces) = state.cache.get_cached_public_spaces().await {
             if !cached_spaces.is_empty() {
                 tracing::info!("Returning cached public spaces");
                 return Ok(Json(json!(cached_spaces)));
@@ -48,11 +48,10 @@ pub async fn spaces(
             // Cache public spaces if enabled
             if state.config.spaces.cache {
                 tokio::spawn(async move {
-                    if let Ok(_) = state
-                        .cache
-                        .cache_public_spaces(&to_cache, state.config.spaces.ttl)
-                        .await
-                    {
+                    if (state.cache.cache_public_spaces(
+                        &to_cache,
+                        state.config.spaces.ttl,
+                    ).await).is_ok() {
                         tracing::info!("Cached public spaces successfully");
                     } else {
                         tracing::warn!("Failed to cache public spaces");
@@ -60,12 +59,12 @@ pub async fn spaces(
                 });
             }
 
-            return Ok(Json(json!(spaces)));
+            Ok(Json(json!(spaces)))
         }
         None => {
-            return Err(AppserviceError::AppserviceError(
+            Err(AppserviceError::AppserviceError(
                 "No public spaces found".to_string(),
-            ));
+            ))
         }
     }
 }
@@ -76,7 +75,7 @@ pub async fn space(
 ) -> Result<impl IntoResponse, AppserviceError> {
     let server_name = state.config.matrix.server_name.clone();
 
-    let raw_alias = format!("#{}:{}", space, server_name);
+    let raw_alias = format!("#{space}:{server_name}");
 
     let alias = RoomAliasId::parse(&raw_alias)
         .map_err(|e|  {
@@ -95,8 +94,8 @@ pub async fn space(
 
     // Return from cache if enabled and available
     if state.config.spaces.cache {
-        let key = format!("space_summary:{}", space);
-        if let Some(summary) = state.cache.get_cached_data::<RoomSummary>(&key).await.ok() {
+        let key = format!("space_summary:{space}");
+        if let Ok(summary) = state.cache.get_cached_data::<RoomSummary>(&key).await {
             tracing::info!("Returning cached space summary for {}", space);
             return Ok(Json(json!(summary)));
         }
@@ -114,15 +113,15 @@ pub async fn space(
     if state.config.spaces.cache {
         let summary = summary.clone();
         tokio::spawn(async move {
-            let key = format!("space_summary:{}", space);
-            if let Ok(_) = state
-                .cache
-                .cache_data(&key, &summary, state.config.spaces.ttl)
-                .await
-            {
-                tracing::info!("Cached space summary for {}", space);
+            let key = format!("space_summary:{space}");
+            if (state.cache.cache_data(
+                &key,
+                &summary,
+                state.config.spaces.ttl,
+            ).await).is_ok() {
+                tracing::info!("Cached space summary for {space}");
             } else {
-                tracing::warn!("Failed to cache space summary for {}", space);
+                tracing::warn!("Failed to cache space summary for {space}");
             }
         });
     }
@@ -136,7 +135,7 @@ pub async fn space_rooms(
 ) -> Result<impl IntoResponse, AppserviceError> {
     let server_name = state.config.matrix.server_name.clone();
 
-    let raw_alias = format!("#{}:{}", space, server_name);
+    let raw_alias = format!("#{space}:{server_name}");
 
     let alias = RoomAliasId::parse(&raw_alias)
         .map_err(|e| {
