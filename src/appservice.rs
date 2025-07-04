@@ -468,9 +468,9 @@ impl AppService {
 
     pub async fn get_profile(
         &self,
-        user_id: String,
+        user_id: &str,
     ) -> Result<get_profile::v3::Response, anyhow::Error> {
-        let parsed_id = ruma::OwnedUserId::try_from(user_id.clone())?;
+        let parsed_id = ruma::OwnedUserId::try_from(user_id.to_string())?;
 
         let profile = self
             .client
