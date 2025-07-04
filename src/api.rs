@@ -17,7 +17,6 @@ use ruma::events::macros::EventContent;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::sync::Arc;
-use tracing::info;
 
 use sha2::{Digest, Sha256};
 
@@ -59,8 +58,12 @@ pub async fn transactions(
                         tokio::time::sleep(Duration::from_secs(5)).await;
 
                         let room_id = event.room_id().to_owned();
-                        info!("Joining room: {}", room_id);
-                        let _ = state.appservice.join_room(room_id).await;
+                        tracing::info!("Joining room: {}", room_id);
+                        if let Err(e) = state.appservice.join_room(room_id.clone()).await {
+                            tracing::warn!("Failed to join room: {}. Error: {}", room_id, e);
+                        } else {
+                            tracing::info!("Successfully joined room: {}", room_id);
+                        }
                     });
 
                     return Ok(Json(json!({})));
@@ -72,40 +75,17 @@ pub async fn transactions(
 
                 tokio::spawn(async move {
                     let room_id = event.room_id().to_owned();
-                    info!("Joining room: {}", room_id);
-                    let _ = state.appservice.join_room(room_id).await;
+                    tracing::info!("Joining room: {}", room_id);
+                    if let Err(e) = state.appservice.join_room(room_id.clone()).await {
+                        tracing::warn!("Failed to join room: {}. Error: {}", room_id, e);
+                    } else {
+                        tracing::info!("Successfully joined room: {}", room_id);
+                    }
                 });
 
                 return Ok(Json(json!({})));
             }
         };
-
-        // Match commune.room.public types
-
-        /*
-        let room_id = event["room_id"].as_str();
-        let event_type = event["type"].as_str();
-        let public = event["content"]["public"].as_bool();
-
-        match room_id {
-            Some(room_id) => {
-                tracing::info!("Room ID: {}", room_id);
-                let room_id = RoomId::parse(room_id);
-                 match (event_type, public) {
-                    (Some("commune.room.public"), Some(true)) => {
-                        info!("Joining room: {}", room_id);
-                        let _ = state.appservice.join_room(room_id).await;
-                    },
-                    (Some("commune.room.public"), Some(false)) => {
-                        tracing::info!("Leave room");
-
-                    }
-                    _ => {}
-                }
-            }
-            None => {}
-        }
-        */
 
         let public = event["content"]["public"].as_bool();
         if let Ok(event) = serde_json::from_value::<CommunePublicRoomEvent>(event.clone()) {
@@ -113,7 +93,7 @@ pub async fn transactions(
             let room_id = event.room_id().to_owned();
             match public {
                 Some(true) => {
-                    info!("Joining room: {}", room_id);
+                    tracing::info!("Joining room: {}", room_id);
                     let joined = state.appservice.join_room(room_id.clone()).await;
                     // cache the joined status
                     if let Ok(joined) = joined {
@@ -126,10 +106,18 @@ pub async fn transactions(
                     }
                 }
                 Some(false) => {
-                    info!("Leaving room: {}", room_id);
-                    let _ = state.appservice.leave_room(room_id.clone()).await;
+                    tracing::info!("Leaving room: {}", room_id);
+                    if let Err(e) = state.appservice.leave_room(room_id.clone()).await {
+                        tracing::warn!("Failed to leave room: {}. Error: {}", room_id, e);
+                    } else {
+                        tracing::info!("Successfully left room: {}", room_id);
+                    }
                     let cache_key = format!("appservice:joined:{}", room_id);
-                    let _ = state.cache.delete_cached_data(&cache_key).await;
+                    if let Err(e) = state.cache.delete_cached_data(&cache_key).await {
+                        tracing::warn!("Failed to delete room from cache: {}. Error: {}", room_id, e);
+                    } else {
+                        tracing::info!("Successfully removed room from cache: {}", room_id);
+                    }
                 }
                 None => {}
             }
@@ -162,7 +150,7 @@ pub async fn transactions(
                     // Ignore events for rooms on other servers, if configured to local homeserver
                     // users
                     if state.config.appservice.rules.invite_by_local_user {
-                        info!(
+                        tracing::info!(
                             "Ignoring event for room on different server: {}",
                             server_name
                         );
@@ -171,7 +159,7 @@ pub async fn transactions(
                 }
             }
             None => {
-                info!("Ignoring event for room with no server name");
+                tracing::info!("Ignoring event for room with no server name");
                 continue;
             }
         }
@@ -179,30 +167,36 @@ pub async fn transactions(
         // Ignore membership events for other users
         let invited_user = member_event.state_key().to_owned();
         if invited_user != state.appservice.user_id() {
-            info!("Ignoring event for user: {}", invited_user);
+            tracing::info!("Ignoring event for user: {}", invited_user);
             continue;
         }
 
         match membership {
             MembershipState::Invite => {
-                info!("Joining room: {}", room_id);
-                let _ = state.appservice.join_room(room_id.clone()).await;
+                tracing::info!("Joining room: {}", room_id);
+                if let Err(e) = state.appservice.join_room(room_id.clone()).await {
+                    tracing::warn!("Failed to join room: {}. Error: {}", room_id, e);
+                } else {
+                    tracing::info!("Successfully joined room: {}", room_id);
+                }
                 if let Err(_) = state.appservice.add_to_joined_rooms(room_id.clone()) {
                     tracing::warn!("Failed to add room to joined rooms list: {}", room_id);
                 }
             }
             MembershipState::Leave => {
-                let _ = state.appservice.leave_room(room_id.clone()).await;
-                if let Err(_) = state.appservice.remove_from_joined_rooms(&room_id) {
-                    tracing::warn!("Failed to remove room from joined rooms list: {}", room_id);
+                if let Err(e) = state.appservice.leave_room(room_id.clone()).await {
+                    tracing::warn!("Failed to leave room: {}. Error: {}", room_id, e);
+                } else {
+                    tracing::info!("Successfully left room: {}", room_id);
+                }
+                if let Err(e) = state.appservice.remove_from_joined_rooms(&room_id) {
+                    tracing::warn!("Failed to remove room from joined rooms list: {} {}", room_id, e);
                 }
             }
             MembershipState::Ban => {
-                info!("Banned from room: {}", room_id);
-                let _ = state.appservice.leave_room(room_id.clone()).await;
-                //state.appservice.leave_room(room_id).await;
-                if let Err(_) = state.appservice.remove_from_joined_rooms(&room_id) {
-                    tracing::warn!("Failed to remove room from joined rooms list: {}", room_id);
+                tracing::info!("Banned from room: {}", room_id);
+                if let Err(e) = state.appservice.remove_from_joined_rooms(&room_id) {
+                    tracing::warn!("Failed to remove room from joined rooms list: {} {}", room_id, e);
                 }
             }
             _ => {}
@@ -358,7 +352,8 @@ pub async fn matrix_proxy_search(
 
     let body_bytes = match axum::body::to_bytes(req.into_body(), usize::MAX).await {
         Ok(bytes) => bytes,
-        Err(_) => {
+        Err(e) => {
+            tracing::error!("Failed to read request body for {}: {}", &target_url, e);
             return Err(StatusCode::INTERNAL_SERVER_ERROR);
         }
     };
@@ -392,7 +387,7 @@ pub async fn matrix_proxy_search(
     let mut request_builder = state
         .proxy
         .request(method, &target_url)
-        .timeout(Duration::from_secs(25)) // Slightly less than overall timeout
+        .timeout(Duration::from_secs(25)) 
         .bearer_auth(&state.config.appservice.access_token);
 
     let mut filtered_headers = HeaderMap::new();
@@ -411,14 +406,20 @@ pub async fn matrix_proxy_search(
     let response = request_builder
         .send()
         .await
-        .map_err(|_| StatusCode::BAD_GATEWAY)?;
+        .map_err(|e| {
+            tracing::error!("Failed to build request for {}: {}", target_url, e);
+            StatusCode::BAD_GATEWAY
+        })?;
 
     let status = response.status();
     let headers = response.headers().clone();
     let body = response
         .bytes()
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(|e| {
+            tracing::error!("Failed to read response body for {}: {}", target_url, e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
     let to_cache = body.to_vec();
     let ttl = state.config.cache.search.expire_after;
