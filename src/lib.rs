@@ -3,6 +3,7 @@ pub mod appservice;
 pub mod cache;
 pub mod config;
 pub mod error;
+pub mod log;
 pub mod middleware;
 pub mod oidc;
 pub mod ping;

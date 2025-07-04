@@ -33,7 +33,6 @@ pub type HttpClient = ruma::client::http_client::HyperNativeTls;
 
 use std::sync::Mutex;
 
-
 #[derive(Clone)]
 pub struct AppService {
     client: ruma::Client<HttpClient>,
@@ -68,12 +67,12 @@ impl AppService {
 
         if whoami.is_err() {
             tracing::info!("Failed to authenticate with homeserver. Check your access token.");
-            std::process::exit(1);
+            return Err(anyhow::anyhow!(
+                "Failed to authenticate with homeserver. Check your appservice access token."
+            ));
         }
 
-        let joined_rooms = match client
-            .send_request(joined_rooms::v3::Request::new())
-        .await {
+        let joined_rooms = match client.send_request(joined_rooms::v3::Request::new()).await {
             Ok(r) => r.joined_rooms,
             Err(_) => vec![],
         };
@@ -88,7 +87,8 @@ impl AppService {
     }
 
     pub fn add_to_joined_rooms(&self, room_id: OwnedRoomId) -> Result<(), anyhow::Error> {
-        let mut rooms = self.joined_rooms
+        let mut rooms = self
+            .joined_rooms
             .lock()
             .map_err(|_| anyhow::anyhow!("Failed to acquire lock on joined_rooms"))?;
 
@@ -104,7 +104,8 @@ impl AppService {
     }
 
     pub fn remove_from_joined_rooms(&self, room_id: &OwnedRoomId) -> Result<(), anyhow::Error> {
-        let mut rooms = self.joined_rooms
+        let mut rooms = self
+            .joined_rooms
             .lock()
             .map_err(|_| anyhow::anyhow!("Failed to acquire lock on joined_rooms"))?;
 
@@ -469,9 +470,9 @@ impl AppService {
 
     pub async fn get_profile(
         &self,
-        user_id: String,
+        user_id: &str,
     ) -> Result<get_profile::v3::Response, anyhow::Error> {
-        let parsed_id = ruma::OwnedUserId::try_from(user_id.clone())?;
+        let parsed_id = ruma::OwnedUserId::try_from(user_id.to_string())?;
 
         let profile = self
             .client

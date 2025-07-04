@@ -195,7 +195,7 @@ impl Server {
             axum::serve(listener, ServiceExt::<Request>::into_make_service(app)).await?;
         } else {
             tracing::info!("Failed to bind to address: {}", addr);
-            std::process::exit(1);
+            return Err(anyhow::anyhow!("Failed to bind to address: {}", addr));
         }
 
         Ok(())
@@ -230,11 +230,13 @@ pub async fn identity(State(state): State<Arc<AppState>>) -> Result<impl IntoRes
 pub async fn health(
     State(state): State<Arc<AppState>>,
 ) -> Result<impl IntoResponse, AppserviceError> {
-    let _ = state
-        .appservice
+    state.appservice
         .health_check()
         .await
-        .map_err(|_| AppserviceError::AppserviceError("Health check failed".to_string()))?;
+        .map_err(|e| {
+            tracing::error!("Health check failed: {}", e);
+            AppserviceError::HomeserverError("Health check failed. Could not reach homeserver.".to_string())
+        })?;
 
     let user = format!(
         "@{}:{}",

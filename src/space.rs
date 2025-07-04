@@ -36,7 +36,8 @@ pub async fn spaces(
     }
 
     let public_spaces =
-        state.appservice.get_public_spaces().await.map_err(|_| {
+        state.appservice.get_public_spaces().await.map_err(|e| {
+            tracing::error!("Failed to get public spaces: {}", e);
             AppserviceError::AppserviceError("Failed to get public spaces".to_string())
         })?;
 
@@ -78,14 +79,20 @@ pub async fn space(
     let raw_alias = format!("#{}:{}", space, server_name);
 
     let alias = RoomAliasId::parse(&raw_alias)
-        .map_err(|_| AppserviceError::AppserviceError("No Alias".to_string()))?;
+        .map_err(|e|  {
+            tracing::error!("Failed to parse room alias: {}", e);
+            AppserviceError::AppserviceError("No Alias".to_string())
+        })?;
 
     let room_id = state
         .appservice
         .room_id_from_alias(alias)
         .await
-        .map_err(|_| AppserviceError::AppserviceError("Space does not exist.".to_string()))?;
-    //
+        .map_err(|e| {
+            tracing::error!("Failed to get room ID from alias: {}", e);
+            AppserviceError::AppserviceError("Space does not exist.".to_string())
+        })?;
+
     // Return from cache if enabled and available
     if state.config.spaces.cache {
         let key = format!("space_summary:{}", space);
@@ -99,7 +106,10 @@ pub async fn space(
         .appservice
         .get_room_summary(room_id.clone())
         .await
-        .map_err(|_| AppserviceError::AppserviceError("Failed to get space summary".to_string()))?;
+        .map_err(|e| {
+            tracing::error!("Failed to get room summary: {}", e);
+            AppserviceError::AppserviceError("Failed to get space summary".to_string())
+        })?;
 
     if state.config.spaces.cache {
         let summary = summary.clone();
@@ -129,19 +139,26 @@ pub async fn space_rooms(
     let raw_alias = format!("#{}:{}", space, server_name);
 
     let alias = RoomAliasId::parse(&raw_alias)
-        .map_err(|_| AppserviceError::AppserviceError("No Alias".to_string()))?;
+        .map_err(|e| {
+            tracing::error!("Failed to parse room alias: {}", e);
+            AppserviceError::AppserviceError("No Alias".to_string())
+        })?;
 
     let room_id = state
         .appservice
         .room_id_from_alias(alias)
         .await
-        .map_err(|_| AppserviceError::AppserviceError("Space does not exist.".to_string()))?;
+        .map_err(|e| {
+            tracing::error!("Failed to get room ID from alias: {}", e);
+            AppserviceError::AppserviceError("Space does not exist.".to_string())
+        })?;
 
     let hierarchy = state
         .appservice
         .get_room_hierarchy(room_id.clone())
         .await
-        .map_err(|_| {
+        .map_err(|e| {
+            tracing::error!("Failed to get space hierarchy: {}", e);
             AppserviceError::AppserviceError("Failed to get space hierarchy".to_string())
         })?;
 
