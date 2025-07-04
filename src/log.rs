@@ -31,7 +31,7 @@ pub fn setup_sentry(config: &Config) -> Option<ClientInitGuard> {
     }
 }
 
-pub fn setup_tracing(config: &Config) -> WorkerGuard {
+pub fn setup_tracing(config: &Config) -> Result<WorkerGuard, anyhow::Error> {
     let env_filter = if cfg!(debug_assertions) {
         "debug,hyper_util=off,tower_http=off,ruma=off,reqwest=off"
     } else {
@@ -44,10 +44,7 @@ pub fn setup_tracing(config: &Config) -> WorkerGuard {
     };
 
     if !std::path::Path::new(&log_directory).exists() {
-        std::fs::create_dir_all(&log_directory).unwrap_or_else(|e| {
-            tracing::info!("Failed to create log directory: {}", e);
-            std::process::exit(1);
-        });
+        std::fs::create_dir_all(&log_directory)?;
     }
 
     let log_filename = match &config.logging {
@@ -79,7 +76,7 @@ pub fn setup_tracing(config: &Config) -> WorkerGuard {
 
     tracing::info!("Tracing initialized with file logging");
 
-    guard
+    Ok(guard)
 }
 
 

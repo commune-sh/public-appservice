@@ -21,7 +21,7 @@ async fn main() -> anyhow::Result<()> {
     let config = Config::new(&args.config)?;
     
     let _sentry_guard = setup_sentry(&config);
-    let _logging_guard = setup_tracing(&config);
+    let _logging_guard = setup_tracing(&config)?;
     setup_metrics(&config)?;
 
     let state = AppState::new(config.clone())
