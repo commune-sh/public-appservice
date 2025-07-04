@@ -67,7 +67,9 @@ impl AppService {
 
         if whoami.is_err() {
             tracing::info!("Failed to authenticate with homeserver. Check your access token.");
-            std::process::exit(1);
+            return Err(anyhow::anyhow!(
+                "Failed to authenticate with homeserver. Check your appservice access token."
+            ));
         }
 
         let joined_rooms = match client.send_request(joined_rooms::v3::Request::new()).await {
