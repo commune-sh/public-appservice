@@ -3,6 +3,7 @@ use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use sentry::ClientInitGuard;
 use sentry_tracing::EventFilter;
+use metrics_exporter_prometheus::PrometheusBuilder;
 
 pub fn setup_sentry(config: &Config) -> Option<ClientInitGuard> {
     match config.sentry {
@@ -79,4 +80,21 @@ pub fn setup_tracing(config: &Config) -> WorkerGuard {
     tracing::info!("Tracing initialized with file logging");
 
     guard
+}
+
+
+pub fn setup_metrics(config: &Config) -> anyhow::Result<()> {
+    let builder = PrometheusBuilder::new();
+
+    if !config.metrics.enabled || config.metrics.port == 0 {
+        tracing::info!("Metrics is disabled.");
+        return Ok(());
+    }
+
+    builder
+        .with_http_listener(([0, 0, 0, 0], config.metrics.port))
+        .install()?;
+    tracing::info!("Metrics endpoint at http://localhost:{}/metrics", config.metrics.port);
+    
+    Ok(())
 }

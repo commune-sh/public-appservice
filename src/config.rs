@@ -19,7 +19,10 @@ pub struct Config {
     pub logging: Option<Logging>,
     #[serde(default)]
     pub search: Search,
+    #[serde(default)]
     pub sentry: Option<Sentry>,
+    #[serde(default)]
+    pub metrics: Metrics,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -193,6 +196,12 @@ pub struct Logging {
 pub struct Sentry {
     pub enabled: bool,
     pub dsn: String,
+}
+
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+pub struct Metrics {
+    pub enabled: bool,
+    pub port: u16,
 }
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
