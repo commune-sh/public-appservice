@@ -1,5 +1,6 @@
 pub mod api;
 pub mod appservice;
+pub mod db;
 pub mod cache;
 pub mod config;
 pub mod error;
@@ -25,6 +26,7 @@ pub struct AppState {
     pub proxy: ProxyClient,
     pub appservice: appservice::AppService,
     pub transaction_store: ping::TransactionStore,
+    pub db: db::Database,
     pub cache: cache::Cache,
     pub oidc: oidc::AuthMetadata,
 }
@@ -47,11 +49,14 @@ impl AppState {
 
         let oidc = oidc::get_auth_metadata(&config.matrix.homeserver).await?;
 
+        let db = db::Database::new(&config).await;
+
         Ok(Arc::new(Self {
             config,
             proxy: client,
             appservice,
             transaction_store,
+            db,
             cache,
             oidc,
         }))
