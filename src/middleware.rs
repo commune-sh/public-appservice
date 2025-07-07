@@ -195,11 +195,11 @@ pub async fn validate_public_room(
     let cache_key = format!("appservice:joined:{}", room_id);
 
     let joined = match state.cache.get_cached_data::<bool>(&cache_key).await {
-        Ok(cached_result) => {
+        Ok(Some(cached_result)) => {
             tracing::info!("Using cached joined status for room: {}", room_id);
             cached_result
-        }
-        Err(_) => {
+        },
+        Ok(None) | Err(_) => {
             let joined = state.appservice.has_joined_room(id).await.map_err(|e| {
                 tracing::error!("Failed to check joined status for room {}: {}", room_id, e);
                 return AppserviceError::AppserviceError(
