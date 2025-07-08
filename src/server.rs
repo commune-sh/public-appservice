@@ -30,7 +30,8 @@ use crate::rooms::{join_room, leave_room, public_rooms, room_info};
 
 use crate::ping::ping;
 
-use crate::api::{matrix_proxy, matrix_proxy_search, transactions};
+use crate::api::transactions;
+use crate::requests::{matrix_proxy, matrix_proxy_search};
 
 use crate::space::{space, space_rooms, spaces};
 
