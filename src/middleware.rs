@@ -7,7 +7,7 @@ use axum::{
     response::IntoResponse,
 };
 
-use ruma::{RoomAliasId, RoomId};
+use ruma::{RoomAliasId, RoomId, OwnedRoomId};
 
 use serde_json::{Value, json};
 
@@ -17,6 +17,8 @@ use crate::AppState;
 use crate::utils::{room_alias_like, room_id_valid};
 
 use crate::error::AppserviceError;
+
+use crate::cache::CacheKey;
 
 pub fn extract_token(header: &str) -> Option<&str> {
     header.strip_prefix("Bearer ").map(|token| token.trim())
@@ -74,10 +76,34 @@ pub async fn is_admin(
 }
 
 #[derive(Clone, Debug)]
+pub enum ProxyRequestType {
+    RoomState,
+    Messages,
+    Media,
+    Other,
+}
+
+#[derive(Clone, Debug)]
 pub struct Data {
     pub modified_path: Option<String>,
     pub room_id: Option<String>,
     pub is_media_request: bool,
+    pub proxy_request_type: ProxyRequestType,
+}
+
+pub fn parse_request_type(
+    req: &Request<Body>,
+) -> ProxyRequestType {
+    match req.uri().path() {
+        path if path.ends_with("/state") => {
+            ProxyRequestType::RoomState
+        }
+        path if path.ends_with("/messages") => {
+            ProxyRequestType::Messages
+        }
+        path if path.starts_with("/_matrix/client/v1/media/") => ProxyRequestType::Media,
+        _ => ProxyRequestType::Other,
+    }
 }
 
 pub async fn add_data(
@@ -88,6 +114,7 @@ pub async fn add_data(
         modified_path: None,
         room_id: None,
         is_media_request: req.uri().path().starts_with("/_matrix/client/v1/media/"),
+        proxy_request_type: parse_request_type(&req),
     };
 
     req.extensions_mut().insert(data);
@@ -109,6 +136,7 @@ pub async fn validate_room_id(
         modified_path: None,
         room_id: Some(room_id.clone()),
         is_media_request: req.uri().path().starts_with("/_matrix/media/v1/download/"),
+        proxy_request_type: parse_request_type(&req),
     };
 
     // This is a valid room_id, so move on
@@ -189,41 +217,66 @@ pub async fn validate_public_room(
             "No room ID found".to_string(),
         ))?;
 
-    let id = RoomId::parse(room_id)
+    let parsed_room_id = RoomId::parse(room_id)
         .map_err(|_| AppserviceError::AppserviceError("Invalid room ID".to_string()))?;
 
-    let cache_key = format!("appservice:joined:{}", room_id);
+    let is_joined = check_room_membership(&state, room_id, parsed_room_id).await?;
 
-    let joined = match state.cache.get_cached_data::<bool>(&cache_key).await {
-        Ok(cached_result) => {
-            tracing::info!("Using cached joined status for room: {}", room_id);
-            cached_result
-        }
-        Err(_) => {
-            let joined = state.appservice.has_joined_room(id).await.map_err(|e| {
-                tracing::error!("Failed to check joined status for room {}: {}", room_id, e);
-                return AppserviceError::AppserviceError(
-                    "Failed to check joined status".to_string(),
-                );
-            })?;
-
-            if joined {
-                if let Ok(_) = state.cache.cache_data(&cache_key, &joined, 300).await {
-                    tracing::info!("Cached joined status for room: {}", room_id);
-                } else {
-                    tracing::warn!("Failed to cache joined status for room: {}", room_id);
-                }
-            }
-
-            joined
-        }
-    };
-
-    if !joined {
+    if !is_joined {
         return Err(AppserviceError::AppserviceError(
             "Not a public room".to_string(),
         ));
     }
 
     Ok(next.run(req).await)
+}
+
+async fn check_room_membership(
+    state: &AppState,
+    room_id: &str,
+    parsed_room_id: OwnedRoomId,
+) -> Result<bool, AppserviceError> {
+    if !state.config.cache.joined_rooms.enabled {
+        return check_membership_direct(state, room_id, parsed_room_id).await;
+    }
+
+    let cache_key = ("appservice:joined", room_id).cache_key();
+
+    match state.cache.get_cached_data::<bool>(&cache_key).await {
+        Ok(Some(cached_result)) => {
+            tracing::info!("Using cached joined status for room: {}", room_id);
+            Ok(cached_result)
+        }
+        Ok(None) | Err(_) => {
+            let joined = check_membership_direct(state, room_id, parsed_room_id).await?;
+
+            if joined {
+                cache_membership_result(state, &cache_key, room_id).await;
+            }
+
+            Ok(joined)
+        }
+    }
+}
+
+async fn check_membership_direct(
+    state: &AppState,
+    room_id: &str,
+    parsed_room_id: OwnedRoomId,
+) -> Result<bool, AppserviceError> {
+    state
+        .appservice
+        .has_joined_room(parsed_room_id)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to check joined status for room {}: {}", room_id, e);
+            AppserviceError::AppserviceError("Failed to check joined status".to_string())
+        })
+}
+
+async fn cache_membership_result(state: &AppState, cache_key: &str, room_id: &str) {
+    match state.cache.cache_data(cache_key, &true, 300).await {
+        Ok(_) => tracing::info!("Cached joined status for room: {}", room_id),
+        Err(_) => tracing::warn!("Failed to cache joined status for room: {}", room_id),
+    }
 }

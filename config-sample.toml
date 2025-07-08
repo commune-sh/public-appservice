@@ -37,21 +37,25 @@ pool_size = 20
 timeout_secs = 5
 cache_ttl = 300
 
+[cache.joined_rooms]
+enabled = false
+ttl = 3600
+
 [cache.requests]
 enabled = true
 ttl = 3600
 
 [cache.public_rooms]
 enabled = true
-expire_after = 3600
+ttl = 3600
 
 [cache.room_state]
 enabled = true
-expire_after = 3600
+ttl = 3600
 
 [cache.messages]
 enabled = true
-expire_after = 3600
+ttl = 3600
 
 [cache.search]
 enabled = false

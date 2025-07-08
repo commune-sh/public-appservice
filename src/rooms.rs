@@ -36,60 +36,49 @@ use crate::utils;
 
 use crate::error::AppserviceError;
 
-use tracing::{info, warn};
-
 pub async fn public_rooms(
     State(state): State<Arc<AppState>>,
 ) -> Result<impl IntoResponse, AppserviceError> {
-    // read from cache if enabled
 
-    if let Ok(cached_data) = state.cache.get_cached_rooms().await {
-        info!("Public rooms fetched from cache");
+    if let Ok(Some(cached_rooms)) = state.cache.get_cached_data::<Vec<PublicRoom>>("public_rooms").await {
+        tracing::info!("Public rooms fetched from cache ({} rooms)", cached_rooms.len());
         return Ok((
             StatusCode::OK,
             Json(json!({
-                "rooms": json!(cached_data),
+                "rooms": cached_rooms,
             })),
         ));
     }
 
-    let rooms = match state.appservice.joined_rooms_state().await {
-        Ok(Some(rooms)) => rooms,
-        Ok(None) | Err(_) => {
-            return Ok((
-                StatusCode::OK,
-                Json(json!({
-                    "rooms": []
-                })),
-            ));
-        }
-    };
+    let rooms = state.cache
+        .cache_or_fetch(
+            "public_rooms",
+            state.config.cache.public_rooms.ttl,
+            || async {
+                tracing::info!("Cache miss for public rooms, fetching from appservice");
 
-    let state_copy = state.clone();
+                let rooms = match state.appservice.joined_rooms_state().await {
+                    Ok(Some(rooms)) => rooms,
+                    Ok(None) | Err(_) => {
+                        return Ok(Vec::new());
+                    }
+                };
 
-    let processed = process_rooms(state_copy, rooms);
-
-    let to_cache = processed.clone();
-
-    // cache public rooms if enabled
-    if state.config.cache.public_rooms.enabled {
-        tokio::spawn(async move {
-            if let Err(e) = state
-                .cache
-                .cache_rooms(&to_cache, state.config.cache.public_rooms.expire_after)
-                .await
-            {
-                warn!("Failed to cache public rooms: {}", e);
-            } else {
-                info!("Public rooms cached");
+                let processed = process_rooms(state.clone(), rooms);
+                tracing::info!("Processed {} public rooms", processed.len());
+                Ok(processed)
             }
-        });
-    }
+        )
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to get public rooms: {}", e);
+            AppserviceError::AppserviceError("Failed to fetch public rooms".to_string())
+        })?;
 
     Ok((
         StatusCode::OK,
         Json(json!({
-            "rooms": json!(processed),
+            "rooms": rooms,
         })),
     ))
 }
