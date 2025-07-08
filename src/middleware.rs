@@ -74,10 +74,34 @@ pub async fn is_admin(
 }
 
 #[derive(Clone, Debug)]
+pub enum ProxyRequestType {
+    RoomState,
+    Messages,
+    Media,
+    Any,
+}
+
+#[derive(Clone, Debug)]
 pub struct Data {
     pub modified_path: Option<String>,
     pub room_id: Option<String>,
     pub is_media_request: bool,
+    pub proxy_request_type: ProxyRequestType,
+}
+
+pub fn parse_request_type(
+    req: &Request<Body>,
+) -> ProxyRequestType {
+    match req.uri().path() {
+        path if path.contains("/state/") => {
+            ProxyRequestType::RoomState
+        }
+        path if path.contains("/messages/") => {
+            ProxyRequestType::Messages
+        }
+        path if path.starts_with("/_matrix/client/v1/media/") => ProxyRequestType::Media,
+        _ => ProxyRequestType::Any,
+    }
 }
 
 pub async fn add_data(
@@ -88,6 +112,7 @@ pub async fn add_data(
         modified_path: None,
         room_id: None,
         is_media_request: req.uri().path().starts_with("/_matrix/client/v1/media/"),
+        proxy_request_type: parse_request_type(&req),
     };
 
     req.extensions_mut().insert(data);
@@ -109,6 +134,7 @@ pub async fn validate_room_id(
         modified_path: None,
         room_id: Some(room_id.clone()),
         is_media_request: req.uri().path().starts_with("/_matrix/media/v1/download/"),
+        proxy_request_type: parse_request_type(&req),
     };
 
     // This is a valid room_id, so move on
