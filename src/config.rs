@@ -138,14 +138,14 @@ pub struct CacheOptions {
     #[serde(default)]
     pub enabled: bool,
     #[serde(default = "default_cache_ttl")]
-    pub expire_after: u64,
+    pub ttl: u64,
 }
 
 impl Default for CacheOptions {
     fn default() -> Self {
         Self {
             enabled: false,
-            expire_after: default_cache_ttl(),
+            ttl: default_cache_ttl(),
         }
     }
 }

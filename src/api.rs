@@ -291,7 +291,7 @@ pub async fn matrix_proxy(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     let to_cache = body.to_vec();
-    let ttl = state.config.cache.requests.expire_after;
+    let ttl = state.config.cache.requests.ttl;
 
     if state.config.cache.requests.enabled && !is_media_request {
         tokio::spawn(async move {
@@ -422,7 +422,7 @@ pub async fn matrix_proxy_search(
         })?;
 
     let to_cache = body.to_vec();
-    let ttl = state.config.cache.search.expire_after;
+    let ttl = state.config.cache.search.ttl;
 
     if state.config.cache.search.enabled {
         tokio::spawn(async move {

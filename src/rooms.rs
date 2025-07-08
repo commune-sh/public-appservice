@@ -53,7 +53,7 @@ pub async fn public_rooms(
     let rooms = state.cache
         .cache_or_fetch(
             "public_rooms",
-            state.config.cache.public_rooms.expire_after,
+            state.config.cache.public_rooms.ttl,
             || async {
                 tracing::info!("Cache miss for public rooms, fetching from appservice");
 
