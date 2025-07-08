@@ -104,6 +104,8 @@ impl Default for Redis {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Cache {
     #[serde(default)]
+    pub joined_rooms: CacheOptions,
+    #[serde(default)]
     pub requests: CacheOptions,
     #[serde(default)]
     pub public_rooms: CacheOptions,
@@ -120,6 +122,7 @@ pub struct Cache {
 impl Default for Cache {
     fn default() -> Self {
         Self {
+            joined_rooms: CacheOptions::default(),
             requests: CacheOptions::default(),
             public_rooms: CacheOptions::default(),
             room_state: CacheOptions::default(),
