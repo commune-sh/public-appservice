@@ -31,6 +31,13 @@ impl CacheKey for (&str, &str) {
     }
 }
 
+impl CacheKey for (&str, String) {
+    fn cache_key(&self) -> String {
+        format!("{}:{}", self.0, self.1)
+    }
+}
+
+
 #[derive(Debug, Clone)]
 pub struct Cache {
     pub client: redis::Client,
