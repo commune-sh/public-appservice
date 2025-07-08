@@ -78,7 +78,7 @@ pub enum ProxyRequestType {
     RoomState,
     Messages,
     Media,
-    Any,
+    Other,
 }
 
 #[derive(Clone, Debug)]
@@ -93,14 +93,14 @@ pub fn parse_request_type(
     req: &Request<Body>,
 ) -> ProxyRequestType {
     match req.uri().path() {
-        path if path.contains("/state/") => {
+        path if path.ends_with("/state") => {
             ProxyRequestType::RoomState
         }
-        path if path.contains("/messages/") => {
+        path if path.ends_with("/messages") => {
             ProxyRequestType::Messages
         }
         path if path.starts_with("/_matrix/client/v1/media/") => ProxyRequestType::Media,
-        _ => ProxyRequestType::Any,
+        _ => ProxyRequestType::Other,
     }
 }
 

@@ -21,7 +21,7 @@ use std::sync::Arc;
 use sha2::{Digest, Sha256};
 
 use crate::AppState;
-use crate::middleware::Data;
+use crate::middleware::{Data, ProxyRequestType};
 
 #[derive(Clone, Debug, Deserialize, Serialize, EventContent)]
 #[ruma_event(type = "commune.public.room", kind = State, state_key_type = String)]
@@ -211,7 +211,6 @@ pub async fn matrix_proxy(
     State(state): State<Arc<AppState>>,
     req: Request<Body>,
 ) -> Result<Response<Body>, StatusCode> {
-    let is_media_request = data.is_media_request;
 
     let method = req.method().clone();
     let headers = req.headers().clone();
@@ -235,8 +234,35 @@ pub async fn matrix_proxy(
 
     let cache_key = format!("proxy_request:{}", target_url);
 
-    // only cache non-media requests
-    if !state.config.cache.requests.enabled || is_media_request {
+    let skip_cache = match data.proxy_request_type {
+        ProxyRequestType::RoomState => {
+            if state.config.cache.room_state.enabled {
+                false
+            } else {
+                true
+            }
+        },
+        ProxyRequestType::Messages => {
+            if state.config.cache.messages.enabled {
+                false
+            } else {
+                true
+            }
+        },
+        ProxyRequestType::Media => {
+            true
+        },
+        ProxyRequestType::Other => {
+            false
+        },
+    };
+
+    if skip_cache {
+        tracing::info!("Skipping cache for request type: {:?}", data.proxy_request_type);
+    }
+
+    // skip if cache disabled by config for request type
+    if !state.config.cache.requests.enabled || skip_cache {
         return proxy_request_no_cache(state, method, headers, target_url, req).await;
     }
 
