@@ -18,6 +18,8 @@ use crate::utils::{room_alias_like, room_id_valid};
 
 use crate::error::AppserviceError;
 
+use crate::cache::CacheKey;
+
 pub fn extract_token(header: &str) -> Option<&str> {
     header.strip_prefix("Bearer ").map(|token| token.trim())
 }
@@ -238,7 +240,7 @@ async fn check_room_membership(
         return check_membership_direct(state, room_id, parsed_room_id).await;
     }
 
-    let cache_key = format!("appservice:joined:{}", room_id);
+    let cache_key = ("appservice:joined", room_id).cache_key();
 
     match state.cache.get_cached_data::<bool>(&cache_key).await {
         Ok(Some(cached_result)) => {

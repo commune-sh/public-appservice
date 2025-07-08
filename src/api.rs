@@ -23,6 +23,8 @@ use sha2::{Digest, Sha256};
 use crate::AppState;
 use crate::middleware::{Data, ProxyRequestType};
 
+use crate::cache::CacheKey;
+
 #[derive(Clone, Debug, Deserialize, Serialize, EventContent)]
 #[ruma_event(type = "commune.public.room", kind = State, state_key_type = String)]
 pub struct CommunePublicRoomEventContent {
@@ -97,7 +99,7 @@ pub async fn transactions(
                     let joined = state.appservice.join_room(room_id.clone()).await;
                     // cache the joined status
                     if let Ok(joined) = joined {
-                        let cache_key = format!("appservice:joined:{}", room_id);
+                        let cache_key = ("appservice:joined", room_id.as_str()).cache_key();
                         if let Ok(_) = state.cache.cache_data(&cache_key, &joined, 300).await {
                             tracing::info!("Cached joined status for room: {}", room_id);
                         } else {
@@ -112,7 +114,7 @@ pub async fn transactions(
                     } else {
                         tracing::info!("Successfully left room: {}", room_id);
                     }
-                    let cache_key = format!("appservice:joined:{}", room_id);
+                    let cache_key = ("appservice:joined", room_id.as_str()).cache_key();
                     if let Err(e) = state.cache.delete_cached_data(&cache_key).await {
                         tracing::warn!("Failed to delete room from cache: {}. Error: {}", room_id, e);
                     } else {
@@ -232,7 +234,7 @@ pub async fn matrix_proxy(
         }
     }
 
-    let cache_key = format!("proxy_request:{}", target_url);
+    let cache_key = ("proxy_request", target_url.as_str()).cache_key();
 
     let skip_cache = match data.proxy_request_type {
         ProxyRequestType::RoomState => {

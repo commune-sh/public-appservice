@@ -15,6 +15,8 @@ use std::sync::Arc;
 
 use crate::appservice::RoomSummary;
 
+use crate::cache::CacheKey;
+
 pub async fn spaces(
     State(state): State<Arc<AppState>>,
 ) -> Result<impl IntoResponse, AppserviceError> {
@@ -115,7 +117,7 @@ pub async fn space(
         return Ok(Json(json!(summary)));
     }
 
-    let cache_key = format!("space_summary:{}", space);
+    let cache_key = ("space_summary", space.clone()).cache_key();
     if let Ok(Some(cached_summary)) = state.cache.get_cached_data::<RoomSummary>(&cache_key).await {
         tracing::info!("Returning cached space summary for {}", space);
         return Ok(Json(json!(cached_summary)));
@@ -182,7 +184,7 @@ pub async fn space_rooms(
         })?;
 
     if state.config.spaces.cache {
-        let hierarchy_key = format!("space_hierarchy:{}", space);
+        let hierarchy_key = ("space_hierarchy", space.clone()).cache_key();
 
         // check cache first
         if let Ok(Some(cached_hierarchy)) = state.cache.get_cached_data::<Vec<SpaceHierarchyRoomsChunk>>(&hierarchy_key).await {
