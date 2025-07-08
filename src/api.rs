@@ -236,20 +236,12 @@ pub async fn matrix_proxy(
 
     let cache_key = ("proxy_request", target_url.as_str()).cache_key();
 
-    let skip_cache = match data.proxy_request_type {
+    let skip_cache: bool = match data.proxy_request_type {
         ProxyRequestType::RoomState => {
-            if state.config.cache.room_state.enabled {
-                false
-            } else {
-                true
-            }
+            !state.config.cache.room_state.enabled
         },
         ProxyRequestType::Messages => {
-            if state.config.cache.messages.enabled {
-                false
-            } else {
-                true
-            }
+            !state.config.cache.messages.enabled
         },
         ProxyRequestType::Media => {
             true
@@ -258,10 +250,6 @@ pub async fn matrix_proxy(
             false
         },
     };
-
-    if skip_cache {
-        tracing::info!("Skipping cache for request type: {:?}", data.proxy_request_type);
-    }
 
     // skip if cache disabled by config for request type
     if !state.config.cache.requests.enabled || skip_cache {
