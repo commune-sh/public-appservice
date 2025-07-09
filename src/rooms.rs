@@ -39,48 +39,42 @@ use crate::error::AppserviceError;
 pub async fn public_rooms(
     State(state): State<Arc<AppState>>,
 ) -> Result<impl IntoResponse, AppserviceError> {
-
-    if let Ok(Some(cached_rooms)) = state.cache.get_cached_data::<Vec<PublicRoom>>("public_rooms").await {
-        tracing::info!("Public rooms fetched from cache ({} rooms)", cached_rooms.len());
-        return Ok((
-            StatusCode::OK,
-            Json(json!({
-                "rooms": cached_rooms,
-            })),
-        ));
-    }
-
-    let rooms = state.cache
-        .cache_or_fetch(
-            "public_rooms",
-            state.config.cache.public_rooms.ttl,
-            || async {
-                tracing::info!("Cache miss for public rooms, fetching from appservice");
-
-                let rooms = match state.appservice.joined_rooms_state().await {
-                    Ok(Some(rooms)) => rooms,
-                    Ok(None) | Err(_) => {
-                        return Ok(Vec::new());
+    let rooms = if !state.config.cache.public_rooms.enabled {
+        tracing::info!("Public rooms cache is disabled, fetching directly from appservice");
+        fetch_and_process_rooms(state.clone()).await
+    } else {
+        // try cache first
+        if let Ok(Some(cached_rooms)) = state.cache.get_cached_data::<Vec<PublicRoom>>("public_rooms").await {
+            tracing::info!("Public rooms fetched from cache ({} rooms)", cached_rooms.len());
+            cached_rooms
+        } else {
+            state.cache
+                .cache_or_fetch(
+                    "public_rooms",
+                    state.config.cache.public_rooms.ttl,
+                    || async {
+                        tracing::info!("Cache miss for public rooms, fetching from appservice");
+                        let rooms = fetch_and_process_rooms(state.clone()).await;
+                        tracing::info!("Processed {} public rooms", rooms.len());
+                        Ok(rooms)
                     }
-                };
+                )
+                .await
+                .map_err(|e| {
+                    tracing::error!("Failed to get public rooms: {}", e);
+                    AppserviceError::AppserviceError("Failed to fetch public rooms".to_string())
+                })?
+        }
+    };
 
-                let processed = process_rooms(state.clone(), rooms);
-                tracing::info!("Processed {} public rooms", processed.len());
-                Ok(processed)
-            }
-        )
-        .await
-        .map_err(|e| {
-            tracing::error!("Failed to get public rooms: {}", e);
-            AppserviceError::AppserviceError("Failed to fetch public rooms".to_string())
-        })?;
+    Ok((StatusCode::OK, Json(json!({ "rooms": rooms }))))
+}
 
-    Ok((
-        StatusCode::OK,
-        Json(json!({
-            "rooms": rooms,
-        })),
-    ))
+async fn fetch_and_process_rooms(state: Arc<AppState>) -> Vec<PublicRoom> {
+    match state.appservice.joined_rooms_state().await {
+        Ok(Some(rooms)) => process_rooms(state, rooms),
+        Ok(None) | Err(_) => Vec::new(),
+    }
 }
 
 #[derive(Clone, Default, Serialize, Deserialize)]
