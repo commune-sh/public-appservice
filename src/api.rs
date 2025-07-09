@@ -1,8 +1,4 @@
-use axum::{
-    Json,
-    extract::State,
-    http::StatusCode,
-};
+use axum::{Json, extract::State, http::StatusCode};
 
 use ruma::events::room::{
     history_visibility::{HistoryVisibility, RoomHistoryVisibilityEvent},
@@ -112,7 +108,11 @@ pub async fn transactions(
                     }
                     let cache_key = ("appservice:joined", room_id.as_str()).cache_key();
                     if let Err(e) = state.cache.delete_cached_data(&cache_key).await {
-                        tracing::warn!("Failed to delete room from cache: {}. Error: {}", room_id, e);
+                        tracing::warn!(
+                            "Failed to delete room from cache: {}. Error: {}",
+                            room_id,
+                            e
+                        );
                     } else {
                         tracing::info!("Successfully removed room from cache: {}", room_id);
                     }
@@ -177,7 +177,11 @@ pub async fn transactions(
                 } else {
                     tracing::info!("Successfully joined room: {}", room_id);
                 }
-                if state.appservice.add_to_joined_rooms(room_id.clone()).is_err() {
+                if state
+                    .appservice
+                    .add_to_joined_rooms(room_id.clone())
+                    .is_err()
+                {
                     tracing::warn!("Failed to add room to joined rooms list: {}", room_id);
                 }
             }
@@ -188,13 +192,21 @@ pub async fn transactions(
                     tracing::info!("Successfully left room: {}", room_id);
                 }
                 if let Err(e) = state.appservice.remove_from_joined_rooms(&room_id) {
-                    tracing::warn!("Failed to remove room from joined rooms list: {} {}", room_id, e);
+                    tracing::warn!(
+                        "Failed to remove room from joined rooms list: {} {}",
+                        room_id,
+                        e
+                    );
                 }
             }
             MembershipState::Ban => {
                 tracing::info!("Banned from room: {}", room_id);
                 if let Err(e) = state.appservice.remove_from_joined_rooms(&room_id) {
-                    tracing::warn!("Failed to remove room from joined rooms list: {} {}", room_id, e);
+                    tracing::warn!(
+                        "Failed to remove room from joined rooms list: {} {}",
+                        room_id,
+                        e
+                    );
                 }
             }
             _ => {}
@@ -203,4 +215,3 @@ pub async fn transactions(
 
     Ok(Json(json!({})))
 }
-

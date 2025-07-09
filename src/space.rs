@@ -43,44 +43,45 @@ pub async fn spaces(
         };
     }
 
-    if let Ok(Some(cached_spaces)) = state.cache.get_cached_data::<Vec<RoomSummary>>("public_spaces").await {
+    if let Ok(Some(cached_spaces)) = state
+        .cache
+        .get_cached_data::<Vec<RoomSummary>>("public_spaces")
+        .await
+    {
         if !cached_spaces.is_empty() {
-            tracing::info!("Returning cached public spaces ({} spaces)", cached_spaces.len());
+            tracing::info!(
+                "Returning cached public spaces ({} spaces)",
+                cached_spaces.len()
+            );
             return Ok(Json(json!(cached_spaces)));
         }
     }
 
     // cache missed
-    let spaces = state.cache
-        .cache_or_fetch(
-            "public_spaces",
-            state.config.spaces.ttl,
-            || async {
-                tracing::info!("Cache miss for public spaces, fetching from appservice");
+    let spaces = state
+        .cache
+        .cache_or_fetch("public_spaces", state.config.spaces.ttl, || async {
+            tracing::info!("Cache miss for public spaces, fetching from appservice");
 
-                let public_spaces = state.appservice.get_public_spaces().await.map_err(|e| {
-                    tracing::error!("Failed to get public spaces: {}", e);
-                    redis::RedisError::from((
-                        redis::ErrorKind::IoError,
-                        "Failed to get public spaces",
-                    ))
-                })?;
+            let public_spaces = state.appservice.get_public_spaces().await.map_err(|e| {
+                tracing::error!("Failed to get public spaces: {}", e);
+                redis::RedisError::from((redis::ErrorKind::IoError, "Failed to get public spaces"))
+            })?;
 
-                match public_spaces {
-                    Some(spaces) => {
-                        tracing::info!("Fetched and cached {} public spaces", spaces.len());
-                        Ok(spaces)
-                    }
-                    None => {
-                        tracing::warn!("No public spaces found");
-                        Err(redis::RedisError::from((
-                            redis::ErrorKind::ResponseError,
-                            "No public spaces found",
-                        )))
-                    }
+            match public_spaces {
+                Some(spaces) => {
+                    tracing::info!("Fetched and cached {} public spaces", spaces.len());
+                    Ok(spaces)
+                }
+                None => {
+                    tracing::warn!("No public spaces found");
+                    Err(redis::RedisError::from((
+                        redis::ErrorKind::ResponseError,
+                        "No public spaces found",
+                    )))
                 }
             }
-        )
+        })
         .await
         .map_err(|e| {
             tracing::error!("Failed to get public spaces: {}", e);
@@ -97,22 +98,29 @@ pub async fn space(
     let server_name = state.config.matrix.server_name.clone();
     let raw_alias = format!("#{space}:{server_name}");
 
-    let alias = RoomAliasId::parse(&raw_alias)
-        .map_err(|e| {
-            tracing::error!("Failed to parse room alias: {}", e);
-            AppserviceError::AppserviceError("No Alias".to_string())
-        })?;
+    let alias = RoomAliasId::parse(&raw_alias).map_err(|e| {
+        tracing::error!("Failed to parse room alias: {}", e);
+        AppserviceError::AppserviceError("No Alias".to_string())
+    })?;
 
     if !state.config.spaces.cache {
-        let room_id = state.appservice.room_id_from_alias(alias).await.map_err(|e| {
-            tracing::error!("Failed to get room ID from alias: {}", e);
-            AppserviceError::AppserviceError("Space does not exist.".to_string())
-        })?;
+        let room_id = state
+            .appservice
+            .room_id_from_alias(alias)
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to get room ID from alias: {}", e);
+                AppserviceError::AppserviceError("Space does not exist.".to_string())
+            })?;
 
-        let summary = state.appservice.get_room_summary(room_id).await.map_err(|e| {
-            tracing::error!("Failed to get room summary: {}", e);
-            AppserviceError::AppserviceError("Failed to get space summary".to_string())
-        })?;
+        let summary = state
+            .appservice
+            .get_room_summary(room_id)
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to get room summary: {}", e);
+                AppserviceError::AppserviceError("Failed to get space summary".to_string())
+            })?;
 
         return Ok(Json(json!(summary)));
     }
@@ -124,22 +132,25 @@ pub async fn space(
     }
 
     // cache missed
-    let summary = state.cache
-        .cache_or_fetch(
-            &cache_key,
-            state.config.spaces.ttl,
-            || async {
-                tracing::info!("Cache miss for space {}, fetching summary", space);
+    let summary = state
+        .cache
+        .cache_or_fetch(&cache_key, state.config.spaces.ttl, || async {
+            tracing::info!("Cache miss for space {}, fetching summary", space);
 
-                let room_id = state.appservice.room_id_from_alias(alias).await.map_err(|e| {
+            let room_id = state
+                .appservice
+                .room_id_from_alias(alias)
+                .await
+                .map_err(|e| {
                     tracing::error!("Failed to get room ID from alias: {}", e);
-                    redis::RedisError::from((
-                        redis::ErrorKind::IoError,
-                        "Space does not exist",
-                    ))
+                    redis::RedisError::from((redis::ErrorKind::IoError, "Space does not exist"))
                 })?;
 
-                let summary = state.appservice.get_room_summary(room_id).await.map_err(|e| {
+            let summary = state
+                .appservice
+                .get_room_summary(room_id)
+                .await
+                .map_err(|e| {
                     tracing::error!("Failed to get room summary: {}", e);
                     redis::RedisError::from((
                         redis::ErrorKind::IoError,
@@ -147,10 +158,9 @@ pub async fn space(
                     ))
                 })?;
 
-                tracing::info!("Fetched and cached space summary for {}", space);
-                Ok(summary)
-            }
-        )
+            tracing::info!("Fetched and cached space summary for {}", space);
+            Ok(summary)
+        })
         .await
         .map_err(|e| {
             tracing::error!("Failed to get space summary: {}", e);
@@ -168,11 +178,10 @@ pub async fn space_rooms(
 
     let raw_alias = format!("#{space}:{server_name}");
 
-    let alias = RoomAliasId::parse(&raw_alias)
-        .map_err(|e| {
-            tracing::error!("Failed to parse room alias: {}", e);
-            AppserviceError::AppserviceError("No Alias".to_string())
-        })?;
+    let alias = RoomAliasId::parse(&raw_alias).map_err(|e| {
+        tracing::error!("Failed to parse room alias: {}", e);
+        AppserviceError::AppserviceError("No Alias".to_string())
+    })?;
 
     let room_id = state
         .appservice
@@ -187,19 +196,29 @@ pub async fn space_rooms(
         let hierarchy_key = ("space_hierarchy", space.clone()).cache_key();
 
         // check cache first
-        if let Ok(Some(cached_hierarchy)) = state.cache.get_cached_data::<Vec<SpaceHierarchyRoomsChunk>>(&hierarchy_key).await {
-            tracing::info!("Returning cached space hierarchy for {} ({} rooms)", space, cached_hierarchy.len());
+        if let Ok(Some(cached_hierarchy)) = state
+            .cache
+            .get_cached_data::<Vec<SpaceHierarchyRoomsChunk>>(&hierarchy_key)
+            .await
+        {
+            tracing::info!(
+                "Returning cached space hierarchy for {} ({} rooms)",
+                space,
+                cached_hierarchy.len()
+            );
             return Ok(Json(json!(cached_hierarchy)));
         }
 
-        let hierarchy = state.cache
-            .cache_or_fetch(
-                &hierarchy_key,
-                state.config.spaces.ttl,
-                || async {
-                    tracing::info!("Cache miss for space hierarchy {}, fetching", space);
+        let hierarchy = state
+            .cache
+            .cache_or_fetch(&hierarchy_key, state.config.spaces.ttl, || async {
+                tracing::info!("Cache miss for space hierarchy {}, fetching", space);
 
-                    let hierarchy = state.appservice.get_room_hierarchy(room_id.clone()).await.map_err(|e| {
+                let hierarchy = state
+                    .appservice
+                    .get_room_hierarchy(room_id.clone())
+                    .await
+                    .map_err(|e| {
                         tracing::error!("Failed to get space hierarchy: {}", e);
                         redis::RedisError::from((
                             redis::ErrorKind::IoError,
@@ -207,10 +226,13 @@ pub async fn space_rooms(
                         ))
                     })?;
 
-                    tracing::info!("Fetched and cached space hierarchy for {} ({} rooms)", space, hierarchy.len());
-                    Ok(hierarchy)
-                }
-            )
+                tracing::info!(
+                    "Fetched and cached space hierarchy for {} ({} rooms)",
+                    space,
+                    hierarchy.len()
+                );
+                Ok(hierarchy)
+            })
             .await
             .map_err(|e| {
                 tracing::error!("Failed to get space hierarchy: {}", e);

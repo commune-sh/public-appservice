@@ -22,9 +22,7 @@ pub async fn get_auth_metadata(homeserver: &str) -> Result<AuthMetadata, anyhow:
         .get(&url)
         .send()
         .await
-        .map_err(|e| {
-            anyhow::anyhow!("Failed to fetch auth metadata from {}: {}", url, e)
-        })?;
+        .map_err(|e| anyhow::anyhow!("Failed to fetch auth metadata from {}: {}", url, e))?;
 
     let metadata = response
         .json::<AuthMetadata>()

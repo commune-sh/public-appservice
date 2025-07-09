@@ -21,7 +21,6 @@ pub async fn matrix_proxy(
     State(state): State<Arc<AppState>>,
     req: Request<Body>,
 ) -> Result<Response<Body>, StatusCode> {
-
     let method = req.method().clone();
     let headers = req.headers().clone();
 
@@ -45,18 +44,10 @@ pub async fn matrix_proxy(
     let cache_key = ("proxy_request", target_url.as_str()).cache_key();
 
     let skip_cache: bool = match data.proxy_request_type {
-        ProxyRequestType::RoomState => {
-            !state.config.cache.room_state.enabled
-        },
-        ProxyRequestType::Messages => {
-            !state.config.cache.messages.enabled
-        },
-        ProxyRequestType::Media => {
-            true
-        },
-        ProxyRequestType::Other => {
-            false
-        },
+        ProxyRequestType::RoomState => !state.config.cache.room_state.enabled,
+        ProxyRequestType::Messages => !state.config.cache.messages.enabled,
+        ProxyRequestType::Media => true,
+        ProxyRequestType::Other => false,
     };
 
     // skip if cache disabled by config for request type
@@ -65,7 +56,11 @@ pub async fn matrix_proxy(
     }
 
     if let Ok(Some(cached_response)) = state.cache.get_cached_data::<Vec<u8>>(&cache_key).await {
-        tracing::info!("Returning cached proxy response for {} ({} bytes)", target_url, cached_response.len());
+        tracing::info!(
+            "Returning cached proxy response for {} ({} bytes)",
+            target_url,
+            cached_response.len()
+        );
 
         return Response::builder()
             .status(StatusCode::OK)
@@ -78,76 +73,68 @@ pub async fn matrix_proxy(
     }
 
     // cache missed
-    let response_data = state.cache
-        .cache_or_fetch(
-            &cache_key,
-            state.config.cache.requests.ttl,
-            || async {
-                tracing::info!("Cache miss for proxy request: {}", target_url);
+    let response_data = state
+        .cache
+        .cache_or_fetch(&cache_key, state.config.cache.requests.ttl, || async {
+            tracing::info!("Cache miss for proxy request: {}", target_url);
 
-                let body_bytes = match axum::body::to_bytes(req.into_body(), usize::MAX).await {
-                    Ok(bytes) => bytes,
-                    Err(_) => {
-                        return Err(redis::RedisError::from((
-                            redis::ErrorKind::IoError,
-                            "Failed to read request body",
-                        )));
-                    }
-                };
-
-                let mut request_builder = state
-                    .proxy
-                    .request(method.clone(), &target_url)
-                    .timeout(Duration::from_secs(25))
-                    .bearer_auth(&state.config.appservice.access_token);
-
-                let mut filtered_headers = HeaderMap::new();
-                for (name, value) in headers.iter() {
-                    if !is_hop_by_hop_header(name.as_str()) && name != "authorization" {
-                        filtered_headers.insert(name, value.clone());
-                    }
+            let body_bytes = match axum::body::to_bytes(req.into_body(), usize::MAX).await {
+                Ok(bytes) => bytes,
+                Err(_) => {
+                    return Err(redis::RedisError::from((
+                        redis::ErrorKind::IoError,
+                        "Failed to read request body",
+                    )));
                 }
+            };
 
-                request_builder = request_builder.headers(filtered_headers);
+            let mut request_builder = state
+                .proxy
+                .request(method.clone(), &target_url)
+                .timeout(Duration::from_secs(25))
+                .bearer_auth(&state.config.appservice.access_token);
 
-                if !body_bytes.is_empty() {
-                    request_builder = request_builder.body(body_bytes);
+            let mut filtered_headers = HeaderMap::new();
+            for (name, value) in headers.iter() {
+                if !is_hop_by_hop_header(name.as_str()) && name != "authorization" {
+                    filtered_headers.insert(name, value.clone());
                 }
-
-                let response = request_builder
-                    .send()
-                    .await
-                    .map_err(|e| {
-                        tracing::error!("Proxy request failed for {}: {}", target_url, e);
-                        redis::RedisError::from((
-                            redis::ErrorKind::IoError,
-                            "Proxy request failed",
-                        ))
-                    })?;
-
-                let body = response
-                    .bytes()
-                    .await
-                    .map_err(|e| {
-                        tracing::error!("Failed to read proxy response body for {}: {}", target_url, e);
-                        redis::RedisError::from((
-                            redis::ErrorKind::IoError,
-                            "Failed to read response body",
-                        ))
-                    })?;
-
-                let response_vec = body.to_vec();
-                tracing::info!("Fetched and cached proxy response for {} ({} bytes)", target_url, response_vec.len());
-
-                Ok(response_vec)
             }
-        )
+
+            request_builder = request_builder.headers(filtered_headers);
+
+            if !body_bytes.is_empty() {
+                request_builder = request_builder.body(body_bytes);
+            }
+
+            let response = request_builder.send().await.map_err(|e| {
+                tracing::error!("Proxy request failed for {}: {}", target_url, e);
+                redis::RedisError::from((redis::ErrorKind::IoError, "Proxy request failed"))
+            })?;
+
+            let body = response.bytes().await.map_err(|e| {
+                tracing::error!(
+                    "Failed to read proxy response body for {}: {}",
+                    target_url,
+                    e
+                );
+                redis::RedisError::from((redis::ErrorKind::IoError, "Failed to read response body"))
+            })?;
+
+            let response_vec = body.to_vec();
+            tracing::info!(
+                "Fetched and cached proxy response for {} ({} bytes)",
+                target_url,
+                response_vec.len()
+            );
+
+            Ok(response_vec)
+        })
         .await
         .map_err(|e| {
             tracing::error!("Failed to get proxy response for {}: {}", target_url, e);
             StatusCode::BAD_GATEWAY
         })?;
-
 
     Response::builder()
         .status(StatusCode::OK)
@@ -282,7 +269,7 @@ pub async fn matrix_proxy_search(
     let mut request_builder = state
         .proxy
         .request(method, &target_url)
-        .timeout(Duration::from_secs(25)) 
+        .timeout(Duration::from_secs(25))
         .bearer_auth(&state.config.appservice.access_token);
 
     let mut filtered_headers = HeaderMap::new();
@@ -298,31 +285,29 @@ pub async fn matrix_proxy_search(
         request_builder = request_builder.body(body_bytes);
     }
 
-    let response = request_builder
-        .send()
-        .await
-        .map_err(|e| {
-            tracing::error!("Failed to build request for {}: {}", target_url, e);
-            StatusCode::BAD_GATEWAY
-        })?;
+    let response = request_builder.send().await.map_err(|e| {
+        tracing::error!("Failed to build request for {}: {}", target_url, e);
+        StatusCode::BAD_GATEWAY
+    })?;
 
     let status = response.status();
     let headers = response.headers().clone();
-    let body = response
-        .bytes()
-        .await
-        .map_err(|e| {
-            tracing::error!("Failed to read response body for {}: {}", target_url, e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
+    let body = response.bytes().await.map_err(|e| {
+        tracing::error!("Failed to read response body for {}: {}", target_url, e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     let to_cache = body.to_vec();
     let ttl = state.config.cache.search.ttl;
 
     if state.config.cache.search.enabled {
         tokio::spawn(async move {
-            if(state.cache.cache_proxy_response(&cache_key, &to_cache, ttl).await).is_ok() {
-
+            if (state
+                .cache
+                .cache_proxy_response(&cache_key, &to_cache, ttl)
+                .await)
+                .is_ok()
+            {
                 tracing::info!("Cached proxied search response for {}", target_url);
             } else {
                 tracing::warn!("Failed to cache search response for {}", target_url);

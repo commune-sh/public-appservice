@@ -7,7 +7,7 @@ use axum::{
     response::IntoResponse,
 };
 
-use ruma::{RoomAliasId, RoomId, OwnedRoomId};
+use ruma::{OwnedRoomId, RoomAliasId, RoomId};
 
 use serde_json::{Value, json};
 
@@ -91,16 +91,10 @@ pub struct Data {
     pub proxy_request_type: ProxyRequestType,
 }
 
-pub fn parse_request_type(
-    req: &Request<Body>,
-) -> ProxyRequestType {
+pub fn parse_request_type(req: &Request<Body>) -> ProxyRequestType {
     match req.uri().path() {
-        path if path.ends_with("/state") => {
-            ProxyRequestType::RoomState
-        }
-        path if path.ends_with("/messages") => {
-            ProxyRequestType::Messages
-        }
+        path if path.ends_with("/state") => ProxyRequestType::RoomState,
+        path if path.ends_with("/messages") => ProxyRequestType::Messages,
         path if path.starts_with("/_matrix/client/v1/media/") => ProxyRequestType::Media,
         _ => ProxyRequestType::Other,
     }

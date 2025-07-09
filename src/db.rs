@@ -1,5 +1,5 @@
-use sqlx::postgres::{PgPool, PgPoolOptions, PgConnectOptions};
 use sqlx::ConnectOptions;
+use sqlx::postgres::{PgConnectOptions, PgPool, PgPoolOptions};
 use std::process;
 
 use crate::config::Config;
@@ -11,12 +11,14 @@ pub struct Database {
 
 impl Database {
     pub async fn new(config: &Config) -> Self {
-
         let pool: PgPool;
         let mut opts: PgConnectOptions = config.db.url.clone().parse().unwrap();
-        opts = opts.log_statements(tracing::log::LevelFilter::Debug)
-               .log_slow_statements(tracing::log::LevelFilter::Warn, std::time::Duration::from_secs(1));
-
+        opts = opts
+            .log_statements(tracing::log::LevelFilter::Debug)
+            .log_slow_statements(
+                tracing::log::LevelFilter::Warn,
+                std::time::Duration::from_secs(1),
+            );
 
         let pg_pool = PgPoolOptions::new()
             .max_connections(5)
@@ -39,16 +41,14 @@ impl Database {
                     tracing::error!("Caused by: {}", source);
                     error = source;
                 }
-                tracing::error!("Public appservice cannot start without a valid database connection");
+                tracing::error!(
+                    "Public appservice cannot start without a valid database connection"
+                );
 
                 process::exit(1);
             }
         }
 
-        Self {
-            pool: pool.clone(),
-        }
-
+        Self { pool: pool.clone() }
     }
 }
-

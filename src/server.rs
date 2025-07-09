@@ -231,13 +231,12 @@ pub async fn identity(State(state): State<Arc<AppState>>) -> Result<impl IntoRes
 pub async fn health(
     State(state): State<Arc<AppState>>,
 ) -> Result<impl IntoResponse, AppserviceError> {
-    state.appservice
-        .health_check()
-        .await
-        .map_err(|e| {
-            tracing::error!("Health check failed: {}", e);
-            AppserviceError::HomeserverError("Health check failed. Could not reach homeserver.".to_string())
-        })?;
+    state.appservice.health_check().await.map_err(|e| {
+        tracing::error!("Health check failed: {}", e);
+        AppserviceError::HomeserverError(
+            "Health check failed. Could not reach homeserver.".to_string(),
+        )
+    })?;
 
     let user = format!(
         "@{}:{}",

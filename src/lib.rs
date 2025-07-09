@@ -1,14 +1,14 @@
 pub mod api;
 pub mod appservice;
-pub mod db;
 pub mod cache;
 pub mod config;
+pub mod db;
 pub mod error;
 pub mod log;
 pub mod middleware;
-pub mod requests;
 pub mod oidc;
 pub mod ping;
+pub mod requests;
 pub mod rooms;
 pub mod server;
 pub mod space;

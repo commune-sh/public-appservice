@@ -1,9 +1,9 @@
 use crate::config::Config;
-use tracing_appender::non_blocking::WorkerGuard;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use metrics_exporter_prometheus::PrometheusBuilder;
 use sentry::ClientInitGuard;
 use sentry_tracing::EventFilter;
-use metrics_exporter_prometheus::PrometheusBuilder;
+use tracing_appender::non_blocking::WorkerGuard;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 pub fn setup_sentry(config: &Config) -> Option<ClientInitGuard> {
     match config.sentry {
@@ -24,10 +24,8 @@ pub fn setup_sentry(config: &Config) -> Option<ClientInitGuard> {
             } else {
                 None
             }
-        },
-        None => {
-            None
         }
+        None => None,
     }
 }
 
@@ -63,12 +61,14 @@ pub fn setup_tracing(config: &Config) -> Result<WorkerGuard, anyhow::Error> {
         .with_ansi(false);
 
     tracing_subscriber::registry()
-        .with(sentry_tracing::layer().event_filter(|md| match *md.level() {
-            tracing::Level::ERROR => EventFilter::Breadcrumb,
-            tracing::Level::INFO => EventFilter::Event,
-            tracing::Level::WARN => EventFilter::Event,
-            _ => EventFilter::Ignore,
-        }))
+        .with(
+            sentry_tracing::layer().event_filter(|md| match *md.level() {
+                tracing::Level::ERROR => EventFilter::Breadcrumb,
+                tracing::Level::INFO => EventFilter::Event,
+                tracing::Level::WARN => EventFilter::Event,
+                _ => EventFilter::Ignore,
+            }),
+        )
         .with(tracing_subscriber::EnvFilter::new(env_filter))
         .with(console_layer)
         .with(file_layer)
@@ -78,7 +78,6 @@ pub fn setup_tracing(config: &Config) -> Result<WorkerGuard, anyhow::Error> {
 
     Ok(guard)
 }
-
 
 pub fn setup_metrics(config: &Config) -> anyhow::Result<()> {
     let builder = PrometheusBuilder::new();
@@ -91,7 +90,10 @@ pub fn setup_metrics(config: &Config) -> anyhow::Result<()> {
     builder
         .with_http_listener(([0, 0, 0, 0], config.metrics.port))
         .install()?;
-    tracing::info!("Metrics endpoint at http://localhost:{}/metrics", config.metrics.port);
-    
+    tracing::info!(
+        "Metrics endpoint at http://localhost:{}/metrics",
+        config.metrics.port
+    );
+
     Ok(())
 }

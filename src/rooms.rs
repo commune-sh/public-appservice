@@ -44,11 +44,19 @@ pub async fn public_rooms(
         fetch_and_process_rooms(state.clone()).await
     } else {
         // try cache first
-        if let Ok(Some(cached_rooms)) = state.cache.get_cached_data::<Vec<PublicRoom>>("public_rooms").await {
-            tracing::info!("Public rooms fetched from cache ({} rooms)", cached_rooms.len());
+        if let Ok(Some(cached_rooms)) = state
+            .cache
+            .get_cached_data::<Vec<PublicRoom>>("public_rooms")
+            .await
+        {
+            tracing::info!(
+                "Public rooms fetched from cache ({} rooms)",
+                cached_rooms.len()
+            );
             cached_rooms
         } else {
-            state.cache
+            state
+                .cache
                 .cache_or_fetch(
                     "public_rooms",
                     state.config.cache.public_rooms.ttl,
@@ -57,7 +65,7 @@ pub async fn public_rooms(
                         let rooms = fetch_and_process_rooms(state.clone()).await;
                         tracing::info!("Processed {} public rooms", rooms.len());
                         Ok(rooms)
-                    }
+                    },
                 )
                 .await
                 .map_err(|e| {
@@ -365,11 +373,10 @@ pub async fn room_info(
         room_id = id.to_string();
     }
 
-    let mut parsed_id = RoomId::parse(&room_id)
-        .map_err(|e| {
-            tracing::error!("Invalid room ID: {}", &room_id);
-            AppserviceError::MatrixError(format!("Invalid room ID: {e}"))
-        })?;
+    let mut parsed_id = RoomId::parse(&room_id).map_err(|e| {
+        tracing::error!("Invalid room ID: {}", &room_id);
+        AppserviceError::MatrixError(format!("Invalid room ID: {e}"))
+    })?;
 
     let summary = state
         .appservice
@@ -408,12 +415,14 @@ pub async fn room_info(
                         .appservice
                         .get_room_summary(parsed_id.clone())
                         .await
-                        .map_err(|e| 
-                            {
-                                tracing::error!("Failed to fetch room summary for {}: {}", parsed_id, e);
-                                AppserviceError::MatrixError("Room not found".to_string())
-                            }
-                        )?;
+                        .map_err(|e| {
+                            tracing::error!(
+                                "Failed to fetch room summary for {}: {}",
+                                parsed_id,
+                                e
+                            );
+                            AppserviceError::MatrixError("Room not found".to_string())
+                        })?;
 
                     info.room = Some(summary);
                     break;
@@ -423,34 +432,29 @@ pub async fn room_info(
     }
 
     if let Some(event_id) = query.event {
-        let parsed_event_id = EventId::parse(&event_id)
-            .map_err(|e| {
-                tracing::error!("Invalid event ID: {}", &event_id);
-                AppserviceError::MatrixError(format!("Invalid event ID: {e}"))
-            })?;
+        let parsed_event_id = EventId::parse(&event_id).map_err(|e| {
+            tracing::error!("Invalid event ID: {}", &event_id);
+            AppserviceError::MatrixError(format!("Invalid event ID: {e}"))
+        })?;
 
         let event = state
             .appservice
             .get_room_event(parsed_id, parsed_event_id)
             .await
-            .map_err(|e| 
-                {
-                    tracing::error!("Failed to fetch event {}: {}", event_id, e);
-                    AppserviceError::MatrixError("Event not found".to_string())
-                }
-            )?;
+            .map_err(|e| {
+                tracing::error!("Failed to fetch event {}: {}", event_id, e);
+                AppserviceError::MatrixError("Event not found".to_string())
+            })?;
 
         info.event = Some(event.clone());
 
         if let Ok(Some(sender)) = event.get_field::<String>("sender") {
             tracing::info!("sender: {:#?}", sender);
 
-            let profile =
-                state.appservice.get_profile(&sender).await.map_err(|e| {
-                    tracing::error!("Failed to fetch profile for {}: {}", sender, e);
-                AppserviceError::MatrixError(
-                    "Failed to fetch sender profile".to_string(),)
-                })?;
+            let profile = state.appservice.get_profile(&sender).await.map_err(|e| {
+                tracing::error!("Failed to fetch profile for {}: {}", sender, e);
+                AppserviceError::MatrixError("Failed to fetch sender profile".to_string())
+            })?;
 
             info.sender = Some(Sender {
                 avatar_url: profile.avatar_url,
@@ -468,15 +472,16 @@ pub async fn join_room(
 ) -> Result<impl IntoResponse, AppserviceError> {
     tracing::info!("Requested to join room: {}", room_id);
 
-    let room_id = RoomId::parse(&room_id)
-        .map_err(|e| {
-            tracing::error!("Invalid room ID: {}", &room_id);
-            AppserviceError::MatrixError(format!("Invalid room ID: {e}"))
-        })?;
+    let room_id = RoomId::parse(&room_id).map_err(|e| {
+        tracing::error!("Invalid room ID: {}", &room_id);
+        AppserviceError::MatrixError(format!("Invalid room ID: {e}"))
+    })?;
 
     if let Err(e) = state.appservice.join_room(room_id.clone()).await {
         tracing::error!("Failed to join room {}: {}", room_id, e);
-        return Err(AppserviceError::MatrixError(format!("Failed to join room: {e}")));
+        return Err(AppserviceError::MatrixError(format!(
+            "Failed to join room: {e}"
+        )));
     }
 
     Ok((
@@ -493,15 +498,16 @@ pub async fn leave_room(
 ) -> Result<impl IntoResponse, AppserviceError> {
     tracing::info!("Requested to leave room: {}", room_id);
 
-    let room_id = RoomId::parse(&room_id)
-        .map_err(|e| {
-            tracing::error!("Invalid room ID: {}", &room_id);
-            AppserviceError::MatrixError(format!("Invalid room ID: {e}"))
-        })?;
+    let room_id = RoomId::parse(&room_id).map_err(|e| {
+        tracing::error!("Invalid room ID: {}", &room_id);
+        AppserviceError::MatrixError(format!("Invalid room ID: {e}"))
+    })?;
 
     if let Err(e) = state.appservice.leave_room(room_id.clone()).await {
         tracing::error!("Failed to leave room {}: {}", room_id, e);
-        return Err(AppserviceError::MatrixError(format!("Failed to leave room: {e}")));
+        return Err(AppserviceError::MatrixError(format!(
+            "Failed to leave room: {e}"
+        )));
     }
 
     Ok((

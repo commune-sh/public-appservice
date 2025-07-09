@@ -15,8 +15,8 @@ pub fn room_id_valid(room_id: &str, server_name: &str) -> Result<OwnedRoomId, an
     Ok(parsed_id)
 }
 
-static SLUG_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"[^a-zA-Z0-9]+")
-    .expect("Failed to compile regex for slugify"));
+static SLUG_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"[^a-zA-Z0-9]+").expect("Failed to compile regex for slugify"));
 
 pub fn slugify(s: &str) -> String {
     SLUG_REGEX.replace_all(s, "-").to_string().to_lowercase()

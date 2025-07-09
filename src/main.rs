@@ -8,18 +8,13 @@ use crate::AppState;
 
 use anyhow::Context;
 
-
-use log::{
-    setup_tracing,
-    setup_metrics,
-    setup_sentry,
-};
+use log::{setup_metrics, setup_sentry, setup_tracing};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let args = Args::build();
     let config = Config::new(&args.config)?;
-    
+
     let _sentry_guard = setup_sentry(&config);
     let _logging_guard = setup_tracing(&config)?;
     setup_metrics(&config)?;

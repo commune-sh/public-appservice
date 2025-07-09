@@ -37,7 +37,6 @@ impl CacheKey for (&str, String) {
     }
 }
 
-
 #[derive(Debug, Clone)]
 pub struct Cache {
     pub client: redis::Client,
@@ -91,7 +90,12 @@ impl Cache {
         Ok(Some(value))
     }
 
-    pub async fn cache_or_fetch<T, F, Fut>(&self, key: &str, ttl: u64, fetch_fn: F) -> Result<T, RedisError>
+    pub async fn cache_or_fetch<T, F, Fut>(
+        &self,
+        key: &str,
+        ttl: u64,
+        fetch_fn: F,
+    ) -> Result<T, RedisError>
     where
         T: Cacheable,
         F: FnOnce() -> Fut,
@@ -102,7 +106,7 @@ impl Cache {
         }
 
         let data = fetch_fn().await?;
-        
+
         let _ = self.cache_data(key, &data, ttl).await;
 
         Ok(data)
@@ -135,31 +139,51 @@ impl Cache {
     }
 
     pub async fn get_cached_rooms(&self) -> Result<Vec<PublicRoom>, RedisError> {
-        self.get_cached_data("public_rooms").await?
+        self.get_cached_data("public_rooms")
+            .await?
             .ok_or_else(|| RedisError::from((redis::ErrorKind::ResponseError, "Key not found")))
     }
 
-    pub async fn get_cached_room_state(&self, room_id: &str) -> Result<Vec<PublicRoom>, RedisError> {
+    pub async fn get_cached_room_state(
+        &self,
+        room_id: &str,
+    ) -> Result<Vec<PublicRoom>, RedisError> {
         let key = format!("room_state:{room_id}");
-        self.get_cached_data(&key).await?
+        self.get_cached_data(&key)
+            .await?
             .ok_or_else(|| RedisError::from((redis::ErrorKind::ResponseError, "Key not found")))
     }
 
-    pub async fn cache_public_spaces(&self, rooms: &Vec<RoomSummary>, ttl: u64) -> Result<(), RedisError> {
+    pub async fn cache_public_spaces(
+        &self,
+        rooms: &Vec<RoomSummary>,
+        ttl: u64,
+    ) -> Result<(), RedisError> {
         self.cache_data("public_spaces", rooms, ttl).await
     }
 
     pub async fn get_cached_public_spaces(&self) -> Result<Vec<RoomSummary>, RedisError> {
-        self.get_cached_data("public_spaces").await?
+        self.get_cached_data("public_spaces")
+            .await?
             .ok_or_else(|| RedisError::from((redis::ErrorKind::ResponseError, "Key not found")))
     }
 
-    pub async fn cache_room_state(&self, room_id: &str, state: &Vec<PublicRoom>, ttl: u64) -> Result<(), RedisError> {
+    pub async fn cache_room_state(
+        &self,
+        room_id: &str,
+        state: &Vec<PublicRoom>,
+        ttl: u64,
+    ) -> Result<(), RedisError> {
         let key = format!("room_state:{room_id}");
         self.cache_data(&key, state, ttl).await
     }
 
-    pub async fn cache_proxy_response(&self, key: &str, data: &[u8], ttl: u64) -> Result<(), RedisError> {
+    pub async fn cache_proxy_response(
+        &self,
+        key: &str,
+        data: &[u8],
+        ttl: u64,
+    ) -> Result<(), RedisError> {
         let mut conn = self.client.get_multiplexed_tokio_connection().await?;
         let _: () = conn.set_ex(key, data, ttl).await?;
         Ok(())
