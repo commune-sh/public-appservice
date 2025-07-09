@@ -96,7 +96,7 @@ pub async fn transactions(
                     // cache the joined status
                     if let Ok(joined) = joined {
                         let cache_key = ("appservice:joined", room_id.as_str()).cache_key();
-                        if let Ok(_) = state.cache.cache_data(&cache_key, &joined, 300).await {
+                        if (state.cache.cache_data(&cache_key, &joined, 300).await).is_ok() {
                             tracing::info!("Cached joined status for room: {}", room_id);
                         } else {
                             tracing::warn!("Failed to cache joined status for room: {}", room_id);
@@ -128,7 +128,7 @@ pub async fn transactions(
                 continue;
             };
 
-        print!("Member Event: {:#?}", member_event);
+        println!("Member Event: {member_event:#?}");
 
         let room_id = member_event.room_id().to_owned();
         let membership = member_event.membership().to_owned();
@@ -177,7 +177,7 @@ pub async fn transactions(
                 } else {
                     tracing::info!("Successfully joined room: {}", room_id);
                 }
-                if let Err(_) = state.appservice.add_to_joined_rooms(room_id.clone()) {
+                if state.appservice.add_to_joined_rooms(room_id.clone()).is_err() {
                     tracing::warn!("Failed to add room to joined rooms list: {}", room_id);
                 }
             }

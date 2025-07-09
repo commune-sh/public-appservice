@@ -147,8 +147,8 @@ pub async fn validate_room_id(
 
     // If the alias is partial like room:server.com without the leading #, we assume it's a room alias
     let raw_alias = room_alias_like(&room_id)
-        .then_some(format!("#{}", room_id))
-        .unwrap_or_else(|| format!("#{}:{}", room_id, server_name));
+        .then_some(format!("#{room_id}"))
+        .unwrap_or_else(|| format!("#{room_id}:{server_name}"));
 
     if let Ok(alias) = RoomAliasId::parse(&raw_alias) {
         let id = state.appservice.room_id_from_alias(alias).await;
@@ -186,7 +186,7 @@ pub async fn validate_room_id(
 
                 // Preserve query string if it exists
                 let new_uri = if let Some(query) = req.uri().query() {
-                    format!("{}?{}", new_path, query)
+                    format!("{new_path}?{query}")
                         .parse::<Uri>()
                         .unwrap_or_default()
                 } else {

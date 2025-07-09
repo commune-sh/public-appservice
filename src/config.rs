@@ -52,7 +52,7 @@ pub struct AppService {
     pub rules: AppServiceRules,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct AppServiceRules {
     #[serde(default)]
     pub auto_join: bool,
@@ -60,16 +60,6 @@ pub struct AppServiceRules {
     pub invite_by_local_user: bool,
     #[serde(default)]
     pub federation_domain_whitelist: Vec<String>,
-}
-
-impl Default for AppServiceRules {
-    fn default() -> Self {
-        Self {
-            auto_join: false,
-            invite_by_local_user: false,
-            federation_domain_whitelist: Vec::new(),
-        }
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -101,7 +91,7 @@ impl Default for Redis {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct Cache {
     #[serde(default)]
     pub joined_rooms: CacheOptions,
@@ -117,20 +107,6 @@ pub struct Cache {
     pub media: CacheOptions,
     #[serde(default)]
     pub search: CacheOptions,
-}
-
-impl Default for Cache {
-    fn default() -> Self {
-        Self {
-            joined_rooms: CacheOptions::default(),
-            requests: CacheOptions::default(),
-            public_rooms: CacheOptions::default(),
-            room_state: CacheOptions::default(),
-            messages: CacheOptions::default(),
-            media: CacheOptions::default(),
-            search: CacheOptions::default(),
-        }
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -155,21 +131,12 @@ pub struct DB {
     pub url: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct PublicRooms {
     #[serde(default)]
     pub curated: bool,
     #[serde(default)]
     pub include_rooms: Vec<String>,
-}
-
-impl Default for PublicRooms {
-    fn default() -> Self {
-        Self {
-            curated: false,
-            include_rooms: Vec::new(),
-        }
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

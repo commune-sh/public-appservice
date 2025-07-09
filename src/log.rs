@@ -8,7 +8,7 @@ use metrics_exporter_prometheus::PrometheusBuilder;
 pub fn setup_sentry(config: &Config) -> Option<ClientInitGuard> {
     match config.sentry {
         Some(ref sentry_config) => {
-            if sentry_config.enabled && sentry_config.dsn != "" {
+            if sentry_config.enabled && !sentry_config.dsn.is_empty() {
                 let dsn = sentry_config.dsn.clone();
                 tracing::info!("Sentry is enabled with DSN.");
                 let guard = sentry::init((
@@ -63,10 +63,10 @@ pub fn setup_tracing(config: &Config) -> Result<WorkerGuard, anyhow::Error> {
         .with_ansi(false);
 
     tracing_subscriber::registry()
-        .with(sentry_tracing::layer().event_filter(|md| match md.level() {
-            &tracing::Level::ERROR => EventFilter::Breadcrumb,
-            &tracing::Level::INFO => EventFilter::Event,
-            &tracing::Level::WARN => EventFilter::Event,
+        .with(sentry_tracing::layer().event_filter(|md| match *md.level() {
+            tracing::Level::ERROR => EventFilter::Breadcrumb,
+            tracing::Level::INFO => EventFilter::Event,
+            tracing::Level::WARN => EventFilter::Event,
             _ => EventFilter::Ignore,
         }))
         .with(tracing_subscriber::EnvFilter::new(env_filter))

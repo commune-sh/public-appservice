@@ -257,7 +257,7 @@ pub async fn matrix_proxy_search(
         let mut hasher = Sha256::new();
         hasher.update(&body_bytes);
         let body_hash = format!("{:x}", hasher.finalize());
-        format!("proxy_post_request:{}:{}", target_url, body_hash)
+        format!("proxy_post_request:{target_url}:{body_hash}")
     } else {
         String::new()
     };
@@ -321,11 +321,8 @@ pub async fn matrix_proxy_search(
 
     if state.config.cache.search.enabled {
         tokio::spawn(async move {
-            if let Ok(_) = state
-                .cache
-                .cache_proxy_response(&cache_key, &to_cache, ttl)
-                .await
-            {
+            if(state.cache.cache_proxy_response(&cache_key, &to_cache, ttl).await).is_ok() {
+
                 tracing::info!("Cached proxied search response for {}", target_url);
             } else {
                 tracing::warn!("Failed to cache search response for {}", target_url);

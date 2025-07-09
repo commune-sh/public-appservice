@@ -140,7 +140,7 @@ impl Cache {
     }
 
     pub async fn get_cached_room_state(&self, room_id: &str) -> Result<Vec<PublicRoom>, RedisError> {
-        let key = format!("room_state:{}", room_id);
+        let key = format!("room_state:{room_id}");
         self.get_cached_data(&key).await?
             .ok_or_else(|| RedisError::from((redis::ErrorKind::ResponseError, "Key not found")))
     }
@@ -155,7 +155,7 @@ impl Cache {
     }
 
     pub async fn cache_room_state(&self, room_id: &str, state: &Vec<PublicRoom>, ttl: u64) -> Result<(), RedisError> {
-        let key = format!("room_state:{}", room_id);
+        let key = format!("room_state:{room_id}");
         self.cache_data(&key, state, ttl).await
     }
 

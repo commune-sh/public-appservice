@@ -267,7 +267,7 @@ impl AppService {
                     async move {
                         let _permit = sem.acquire().await.ok()?;
 
-                        let alias = format!("#{}:{}", local_part, server_name);
+                        let alias = format!("#{local_part}:{server_name}");
                         let alias = RoomAliasId::parse(&alias).ok()?;
                         let room_id = self_ref.room_id_from_alias(alias).await.ok()?;
 
@@ -289,11 +289,9 @@ impl AppService {
             let hierarchy_results = join_all(space_futures).await;
 
             let mut unique_room_ids = HashSet::new();
-            for result in hierarchy_results {
-                if let Some(room_ids) = result {
-                    for room_id in room_ids {
-                        unique_room_ids.insert(room_id);
-                    }
+            for room_ids in hierarchy_results.into_iter().flatten() {
+                for room_id in room_ids {
+                    unique_room_ids.insert(room_id);
                 }
             }
             all_room_ids.extend(unique_room_ids);
@@ -321,7 +319,7 @@ impl AppService {
                 .collect();
 
             let state_results = join_all(state_futures).await;
-            let joined_rooms: Vec<_> = state_results.into_iter().filter_map(|x| x).collect();
+            let joined_rooms: Vec<_> = state_results.into_iter().flatten().collect();
 
             return Ok(Some(joined_rooms));
         }
@@ -360,7 +358,7 @@ impl AppService {
             .collect();
 
         let results = join_all(state_futures).await;
-        let joined_rooms: Vec<_> = results.into_iter().filter_map(|x| x).collect();
+        let joined_rooms: Vec<_> = results.into_iter().flatten().collect();
 
         Ok(Some(joined_rooms))
     }
@@ -552,10 +550,7 @@ impl AppService {
                     if let Ok(Some(content)) =
                         state_event.get_field::<RoomAvatarEventContent>("content")
                     {
-                        room_info.banner_url = match content.url {
-                            Some(url) => Some(url.to_string()),
-                            None => None,
-                        };
+                        room_info.banner_url = content.url.map(|url| url.to_string());
                     }
                 }
                 "m.room.topic" => {
@@ -622,7 +617,7 @@ impl AppService {
                 .collect();
 
             let results = join_all(space_futures).await;
-            let spaces: Vec<_> = results.into_iter().filter_map(|x| x).collect();
+            let spaces: Vec<_> = results.into_iter().flatten().collect();
 
             if spaces.is_empty() {
                 return Ok(None);
@@ -646,7 +641,7 @@ impl AppService {
                 async move {
                     let _permit = sem.acquire().await.ok()?;
 
-                    let raw_alias = format!("#{}:{}", space, server_name);
+                    let raw_alias = format!("#{space}:{server_name}");
 
                     let alias = RoomAliasId::parse(&raw_alias).ok()?;
 
@@ -659,7 +654,7 @@ impl AppService {
             .collect();
 
         let results = join_all(space_futures).await;
-        let spaces: Vec<_> = results.into_iter().filter_map(|x| x).collect();
+        let spaces: Vec<_> = results.into_iter().flatten().collect();
 
         Ok(Some(spaces))
     }
