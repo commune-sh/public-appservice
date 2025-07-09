@@ -1,4 +1,4 @@
-### Commune Appservice
+### Public Appservice
 
 This is an appservice for making matrix rooms and spaces publicly accessible - intended
 to be used with [Commune](https://github.com/commune-sh/commune).
@@ -11,14 +11,14 @@ currently running on the [Commune](https://commune.sh) and [Dev](https://dev.com
 
 #### Discovery
 
-The Commune client queries the matrix homeserver's `/.well-known/matrix/client` endpoint to detect whether this appservice is running. Ensure that the endpoint returns the `commune.appservice` URL:
+The Commune client queries the matrix homeserver's `/.well-known/matrix/client` endpoint to detect whether this appservice is running. Ensure that the endpoint returns the `public.appservice` URL:
 
 ```json
 {
   "m.homeserver": {
     "base_url": "https://matrix.commune.sh"
   },
-  "commune.appservice": {
+  "public.appservice": {
     "url": "https://public.commune.sh"
   },
 }
@@ -29,7 +29,7 @@ If you're running Synapse, this can be served by adding the following to you
 
 ```yaml
 extra_well_known_client_content :
-  commune.appservice: 
+  public.appservice: 
     url: "https://public.commune.sh"
 ```
 
