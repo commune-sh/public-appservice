@@ -10,7 +10,6 @@ pub struct Config {
     pub matrix: Matrix,
     #[serde(default)]
     pub redis: Redis,
-    pub db: DB,
     #[serde(default)]
     pub cache: Cache,
     #[serde(default)]
@@ -124,11 +123,6 @@ impl Default for CacheOptions {
             ttl: default_cache_ttl(),
         }
     }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DB {
-    pub url: String,
 }
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]

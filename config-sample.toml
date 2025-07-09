@@ -17,9 +17,6 @@ federation_domain_whitelist = ["matrix.org", "dev.commune.sh"]
 homeserver = "http://localhost:8008"
 server_name = "commune.sh"
 
-[db]
-url = "postgres://postgres:postgres@localhost:5432/public-appservice"
-
 [search]
 disabled = false
 

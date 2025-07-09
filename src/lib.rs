@@ -2,11 +2,9 @@ pub mod api;
 pub mod appservice;
 pub mod cache;
 pub mod config;
-pub mod db;
 pub mod error;
 pub mod log;
 pub mod middleware;
-pub mod oidc;
 pub mod ping;
 pub mod requests;
 pub mod rooms;
@@ -27,9 +25,7 @@ pub struct AppState {
     pub proxy: ProxyClient,
     pub appservice: appservice::AppService,
     pub transaction_store: ping::TransactionStore,
-    pub db: db::Database,
     pub cache: cache::Cache,
-    pub oidc: oidc::AuthMetadata,
 }
 
 impl AppState {
@@ -48,18 +44,12 @@ impl AppState {
 
         let transaction_store = ping::TransactionStore::new();
 
-        let oidc = oidc::get_auth_metadata(&config.matrix.homeserver).await?;
-
-        let db = db::Database::new(&config).await;
-
         Ok(Arc::new(Self {
             config,
             proxy: client,
             appservice,
             transaction_store,
-            db,
             cache,
-            oidc,
         }))
     }
 }
