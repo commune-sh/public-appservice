@@ -72,10 +72,17 @@ pub async fn matrix_proxy(
             });
     }
 
+    let cache_ttl = match data.proxy_request_type {
+        ProxyRequestType::RoomState => state.config.cache.room_state.ttl,
+        ProxyRequestType::Messages => state.config.cache.messages.ttl,
+        ProxyRequestType::Media => 0, 
+        ProxyRequestType::Other => state.config.cache.requests.ttl,
+    };
+
     // cache missed
     let response_data = state
         .cache
-        .cache_or_fetch(&cache_key, state.config.cache.requests.ttl, || async {
+        .cache_or_fetch(&cache_key, cache_ttl, || async {
             tracing::info!("Cache miss for proxy request: {}", target_url);
 
             let body_bytes = match axum::body::to_bytes(req.into_body(), usize::MAX).await {
