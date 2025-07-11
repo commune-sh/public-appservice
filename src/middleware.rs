@@ -260,7 +260,7 @@ async fn check_membership_direct(
 ) -> Result<bool, AppserviceError> {
     state
         .appservice
-        .has_joined_room(parsed_room_id)
+        .has_joined_room(&parsed_room_id)
         .await
         .map_err(|e| {
             tracing::error!("Failed to check joined status for room {}: {}", room_id, e);

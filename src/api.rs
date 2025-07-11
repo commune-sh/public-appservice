@@ -53,7 +53,7 @@ pub async fn transactions(
 
                         let room_id = event.room_id().to_owned();
                         tracing::info!("Joining room: {}", room_id);
-                        if let Err(e) = state.appservice.join_room(room_id.clone()).await {
+                        if let Err(e) = state.appservice.join_room(&room_id).await {
                             tracing::warn!("Failed to join room: {}. Error: {}", room_id, e);
                         } else {
                             tracing::info!("Successfully joined room: {}", room_id);
@@ -70,7 +70,7 @@ pub async fn transactions(
                 tokio::spawn(async move {
                     let room_id = event.room_id().to_owned();
                     tracing::info!("Joining room: {}", room_id);
-                    if let Err(e) = state.appservice.join_room(room_id.clone()).await {
+                    if let Err(e) = state.appservice.join_room(&room_id).await {
                         tracing::warn!("Failed to join room: {}. Error: {}", room_id, e);
                     } else {
                         tracing::info!("Successfully joined room: {}", room_id);
@@ -88,7 +88,7 @@ pub async fn transactions(
             match public {
                 Some(true) => {
                     tracing::info!("Joining room: {}", room_id);
-                    let joined = state.appservice.join_room(room_id.clone()).await;
+                    let joined = state.appservice.join_room(&room_id).await;
                     // cache the joined status
                     if let Ok(joined) = joined {
                         let cache_key = ("appservice:joined", room_id.as_str()).cache_key();
@@ -101,7 +101,7 @@ pub async fn transactions(
                 }
                 Some(false) => {
                     tracing::info!("Leaving room: {}", room_id);
-                    if let Err(e) = state.appservice.leave_room(room_id.clone()).await {
+                    if let Err(e) = state.appservice.leave_room(&room_id).await {
                         tracing::warn!("Failed to leave room: {}. Error: {}", room_id, e);
                     } else {
                         tracing::info!("Successfully left room: {}", room_id);
@@ -172,7 +172,7 @@ pub async fn transactions(
         match membership {
             MembershipState::Invite => {
                 tracing::info!("Joining room: {}", room_id);
-                if let Err(e) = state.appservice.join_room(room_id.clone()).await {
+                if let Err(e) = state.appservice.join_room(&room_id).await {
                     tracing::warn!("Failed to join room: {}. Error: {}", room_id, e);
                 } else {
                     tracing::info!("Successfully joined room: {}", room_id);
@@ -186,7 +186,7 @@ pub async fn transactions(
                 }
             }
             MembershipState::Leave => {
-                if let Err(e) = state.appservice.leave_room(room_id.clone()).await {
+                if let Err(e) = state.appservice.leave_room(&room_id).await {
                     tracing::warn!("Failed to leave room: {}. Error: {}", room_id, e);
                 } else {
                     tracing::info!("Successfully left room: {}", room_id);

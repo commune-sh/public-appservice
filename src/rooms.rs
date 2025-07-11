@@ -477,7 +477,7 @@ pub async fn join_room(
         AppserviceError::MatrixError(format!("Invalid room ID: {e}"))
     })?;
 
-    if let Err(e) = state.appservice.join_room(room_id.clone()).await {
+    if let Err(e) = state.appservice.join_room(&room_id).await {
         tracing::error!("Failed to join room {}: {}", room_id, e);
         return Err(AppserviceError::MatrixError(format!(
             "Failed to join room: {e}"
@@ -503,7 +503,7 @@ pub async fn leave_room(
         AppserviceError::MatrixError(format!("Invalid room ID: {e}"))
     })?;
 
-    if let Err(e) = state.appservice.leave_room(room_id.clone()).await {
+    if let Err(e) = state.appservice.leave_room(&room_id).await {
         tracing::error!("Failed to leave room {}: {}", room_id, e);
         return Err(AppserviceError::MatrixError(format!(
             "Failed to leave room: {e}"

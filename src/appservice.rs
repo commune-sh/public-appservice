@@ -93,13 +93,8 @@ impl AppService {
             .map_err(|_| anyhow::anyhow!("Failed to acquire lock on joined_rooms"))?;
 
         if !rooms.contains(&room_id) {
-            rooms.push(room_id.clone());
+            rooms.push(room_id);
         }
-        tracing::info!(
-            "Added room {} to joined rooms. Current count: {}",
-            room_id,
-            rooms.len()
-        );
         Ok(())
     }
 
@@ -152,7 +147,7 @@ impl AppService {
         Ok(r)
     }
 
-    pub async fn join_room(&self, room_id: OwnedRoomId) -> Result<bool, anyhow::Error> {
+    pub async fn join_room(&self, room_id: &OwnedRoomId) -> Result<bool, anyhow::Error> {
         let jr = self
             .client
             .send_request(join_room_by_id::v3::Request::new(room_id.clone()))
@@ -160,14 +155,14 @@ impl AppService {
 
         tracing::info!("Joined room: {:#?}", jr);
 
-        Ok(jr.room_id == room_id)
+        Ok(jr.room_id == *room_id)
     }
 
-    pub async fn has_joined_room(&self, room_id: OwnedRoomId) -> Result<bool, anyhow::Error> {
+    pub async fn has_joined_room(&self, room_id: &OwnedRoomId) -> Result<bool, anyhow::Error> {
         let jr = self
             .client
             .send_request(get_state_events_for_key::v3::Request::new(
-                room_id,
+                room_id.clone(),
                 StateEventType::RoomMember,
                 self.user_id(),
             ))
@@ -198,7 +193,7 @@ impl AppService {
         Ok(hierarchy.rooms.len() > 1)
     }
 
-    pub async fn leave_room(&self, room_id: OwnedRoomId) -> Result<(), anyhow::Error> {
+    pub async fn leave_room(&self, room_id: &OwnedRoomId) -> Result<(), anyhow::Error> {
         // First leave all child rooms
         let hierarchy = self
             .client
@@ -208,7 +203,7 @@ impl AppService {
         tracing::info!("Hierarchy rooms: {:#?}", hierarchy.rooms.len());
 
         for room in hierarchy.rooms {
-            if room.room_id == room_id {
+            if room.room_id == *room_id {
                 continue;
             }
             let left = self
@@ -221,7 +216,7 @@ impl AppService {
 
         let left = self
             .client
-            .send_request(leave_room::v3::Request::new(room_id))
+            .send_request(leave_room::v3::Request::new(room_id.clone()))
             .await?;
 
         tracing::info!("Left room: {:#?}", left);
@@ -262,7 +257,7 @@ impl AppService {
                 .iter()
                 .map(|local_part| {
                     let sem = semaphore.clone();
-                    let server_name = self.config.matrix.server_name.clone();
+                    let server_name = &self.config.matrix.server_name;
                     let self_ref = self;
                     async move {
                         let _permit = sem.acquire().await.ok()?;
@@ -485,7 +480,7 @@ impl AppService {
         room_id: OwnedRoomId,
     ) -> Result<RoomSummary, anyhow::Error> {
         // find out if appservice has joined the room or not
-        let has_joined = self.has_joined_room(room_id.clone()).await?;
+        let has_joined = self.has_joined_room(&room_id).await?;
 
         if !has_joined {
             // If not joined, we cannot get the state
@@ -636,7 +631,7 @@ impl AppService {
             .into_iter()
             .map(|space| {
                 let sem = semaphore.clone();
-                let server_name = self.config.matrix.server_name.clone();
+                let server_name = &self.config.matrix.server_name;
                 let self_ref = self;
                 async move {
                     let _permit = sem.acquire().await.ok()?;

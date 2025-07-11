@@ -95,7 +95,7 @@ pub async fn space(
     State(state): State<Arc<AppState>>,
     Path(space): Path<String>,
 ) -> Result<impl IntoResponse, AppserviceError> {
-    let server_name = state.config.matrix.server_name.clone();
+    let server_name = &state.config.matrix.server_name;
     let raw_alias = format!("#{space}:{server_name}");
 
     let alias = RoomAliasId::parse(&raw_alias).map_err(|e| {
@@ -174,8 +174,7 @@ pub async fn space_rooms(
     State(state): State<Arc<AppState>>,
     Path(space): Path<String>,
 ) -> Result<impl IntoResponse, AppserviceError> {
-    let server_name = state.config.matrix.server_name.clone();
-
+    let server_name = &state.config.matrix.server_name;
     let raw_alias = format!("#{space}:{server_name}");
 
     let alias = RoomAliasId::parse(&raw_alias).map_err(|e| {
