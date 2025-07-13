@@ -262,7 +262,17 @@ impl AppService {
                     async move {
                         let _permit = sem.acquire().await.ok()?;
 
-                        let alias = format!("#{local_part}:{server_name}");
+                        let alias = match local_part.contains(':') && local_part.contains('.') {
+                            true =>  {
+                                if local_part.starts_with('#') {
+                                    local_part.to_string()
+                                } else {
+                                    format!("#{}", local_part)
+                                }
+                            },
+                            false => format!("#{local_part}:{server_name}"),
+                        };
+
                         let alias = RoomAliasId::parse(&alias).ok()?;
                         let room_id = self_ref.room_id_from_alias(alias).await.ok()?;
 
