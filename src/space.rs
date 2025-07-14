@@ -95,7 +95,11 @@ pub async fn space(
     Path(space): Path<String>,
 ) -> Result<impl IntoResponse, AppserviceError> {
     let server_name = &state.config.matrix.server_name;
-    let raw_alias = format!("#{space}:{server_name}");
+
+    let raw_alias = match space.contains(':') && space.contains('.') {
+        true => format!("#{space}"),
+        false => format!("#{space}:{server_name}"),
+    };
 
     let alias = RoomAliasId::parse(&raw_alias).map_err(|e| {
         tracing::error!("Failed to parse room alias: {}", e);
@@ -174,7 +178,10 @@ pub async fn space_rooms(
     Path(space): Path<String>,
 ) -> Result<impl IntoResponse, AppserviceError> {
     let server_name = &state.config.matrix.server_name;
-    let raw_alias = format!("#{space}:{server_name}");
+    let raw_alias = match space.contains(':') && space.contains('.') {
+        true => format!("#{space}"),
+        false => format!("#{space}:{server_name}"),
+    };
 
     let alias = RoomAliasId::parse(&raw_alias).map_err(|e| {
         tracing::error!("Failed to parse room alias: {}", e);
