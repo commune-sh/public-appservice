@@ -33,6 +33,8 @@ pub type HttpClient = ruma::client::http_client::HyperNativeTls;
 
 use std::sync::Mutex;
 
+use crate::rooms::CommuneRoomType;
+
 #[derive(Clone)]
 pub struct AppService {
     client: ruma::Client<HttpClient>,
@@ -267,7 +269,7 @@ impl AppService {
                                 if local_part.starts_with('#') {
                                     local_part.to_string()
                                 } else {
-                                    format!("#{}", local_part)
+                                    format!("#{local_part}")
                                 }
                             },
                             false => format!("#{local_part}:{server_name}"),
@@ -568,6 +570,17 @@ impl AppService {
                             Some(content.topic.to_string())
                         };
                     }
+                },
+                "commune.room.type" => {
+                    if let Ok(Some(content)) =
+                        state_event.get_field::<CommuneRoomType>("content")
+                    {
+                        match content.room_type.map(|t| t.to_string()) {
+                            Some(t) if t == "chat" => room_info.room_type = RoomType::Chat,
+                            Some(t) if t == "forum" => room_info.room_type = RoomType::Forum,
+                            _ => room_info.room_type = RoomType::Chat, // Default to Chat
+                        }
+                    }
                 }
                 _ => {}
             }
@@ -582,11 +595,48 @@ impl AppService {
     ) -> Result<Vec<SpaceHierarchyRoomsChunk>, anyhow::Error> {
         let hierarchy = self
             .client
-            .send_request(get_hierarchy::v1::Request::new(room_id))
+            .send_request(get_hierarchy::v1::Request::new(room_id.clone()))
             .await?;
 
         Ok(hierarchy.rooms)
     }
+
+    pub async fn get_space_rooms(
+        &self,
+        room_id: OwnedRoomId,
+    ) -> Result<Vec<RoomSummary>, anyhow::Error> {
+
+        let mut hierarchy = self
+            .client
+            .send_request(get_hierarchy::v1::Request::new(room_id.clone()))
+            .await?;
+
+        let mut room_summaries: Vec<RoomSummary> = Vec::new();
+
+        //remove the room itself from the hierarchy
+        hierarchy.rooms.retain(|room| room.room_id != room_id);
+
+        // build room summaries for each room in the hierarchy
+        let semaphore = Arc::new(Semaphore::new(10));
+        let room_futures: Vec<_> = hierarchy.rooms.into_iter().map(|room| {
+            let sem = semaphore.clone();
+            let self_ref = self.clone();
+            async move {
+                let _permit = sem.acquire().await.ok()?;
+
+                let summary = self_ref.get_room_summary(room.room_id).await.ok()?;
+                Some(summary)
+            }
+        }).collect();
+
+        let results = join_all(room_futures).await;
+        for result in results.into_iter().flatten() {
+            room_summaries.push(result);
+        }
+
+        Ok(room_summaries)
+    }
+
 
     pub async fn get_public_spaces(&self) -> Result<Option<Vec<RoomSummary>>, anyhow::Error> {
         let semaphore = Arc::new(Semaphore::new(10));
@@ -651,7 +701,7 @@ impl AppService {
                             if space.starts_with('#') {
                                 space.to_string()
                             } else {
-                                format!("#{}", space)
+                                format!("#{space}")
                             }
                         },
                         false => format!("#{space}:{server_name}"),
@@ -687,4 +737,15 @@ pub struct RoomSummary {
     pub banner_url: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub topic: Option<String>,
+    pub room_type: RoomType,
 }
+
+#[derive(Default, Clone, Debug, Deserialize, Serialize)]
+pub enum RoomType {
+    #[default]
+    #[serde(rename = "chat")]
+    Chat,
+    #[serde(rename = "forum")]
+    Forum
+}
+

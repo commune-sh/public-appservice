@@ -330,9 +330,9 @@ fn process_rooms(_state: Arc<AppState>, rooms: Vec<JoinedRoomState>) -> Vec<Publ
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-struct CommuneRoomType {
+pub struct CommuneRoomType {
     #[serde(rename = "type")]
-    room_type: Option<String>,
+    pub room_type: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

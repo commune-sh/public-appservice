@@ -5,7 +5,6 @@ use axum::{
 };
 
 use ruma::RoomAliasId;
-use ruma::api::client::space::SpaceHierarchyRoomsChunk;
 
 use crate::error::AppserviceError;
 
@@ -192,30 +191,30 @@ pub async fn space_rooms(
         })?;
 
     if state.config.spaces.cache {
-        let hierarchy_key = ("space_hierarchy", space.clone()).cache_key();
+        let cache_key = ("space_rooms", space.clone()).cache_key();
 
         // check cache first
-        if let Ok(Some(cached_hierarchy)) = state
+        if let Ok(Some(cached_space_rooms)) = state
             .cache
-            .get_cached_data::<Vec<SpaceHierarchyRoomsChunk>>(&hierarchy_key)
+            .get_cached_data::<Vec<RoomSummary>>(&cache_key)
             .await
         {
             tracing::info!(
-                "Returning cached space hierarchy for {} ({} rooms)",
+                "Returning cached space rooms for {} ({} rooms)",
                 space,
-                cached_hierarchy.len()
+                cached_space_rooms.len()
             );
-            return Ok(Json(json!(cached_hierarchy)));
+            return Ok(Json(json!(cached_space_rooms)));
         }
 
-        let hierarchy = state
+        let space_rooms = state
             .cache
-            .cache_or_fetch(&hierarchy_key, state.config.spaces.ttl, || async {
+            .cache_or_fetch(&cache_key, state.config.spaces.ttl, || async {
                 tracing::info!("Cache miss for space hierarchy {}, fetching", space);
 
-                let hierarchy = state
+                let space_rooms = state
                     .appservice
-                    .get_room_hierarchy(room_id.clone())
+                    .get_space_rooms(room_id.clone())
                     .await
                     .map_err(|e| {
                         tracing::error!("Failed to get space hierarchy: {}", e);
@@ -228,27 +227,27 @@ pub async fn space_rooms(
                 tracing::info!(
                     "Fetched and cached space hierarchy for {} ({} rooms)",
                     space,
-                    hierarchy.len()
+                    space_rooms.len()
                 );
-                Ok(hierarchy)
+                Ok(space_rooms)
             })
             .await
             .map_err(|e| {
-                tracing::error!("Failed to get space hierarchy: {}", e);
-                AppserviceError::AppserviceError("Failed to get space hierarchy".to_string())
+                tracing::error!("Failed to get space rooms: {}", e);
+                AppserviceError::AppserviceError("Failed to get space rooms".to_string())
             })?;
 
-        return Ok(Json(json!(hierarchy)));
+        return Ok(Json(json!(space_rooms)));
     }
 
-    let hierarchy = state
+    let space_rooms = state
         .appservice
-        .get_room_hierarchy(room_id.clone())
+        .get_space_rooms(room_id.clone())
         .await
         .map_err(|e| {
-            tracing::error!("Failed to get space hierarchy: {}", e);
-            AppserviceError::AppserviceError("Failed to get space hierarchy".to_string())
+            tracing::error!("Failed to get space rooms: {}", e);
+            AppserviceError::AppserviceError("Failed to get space rooms".to_string())
         })?;
 
-    Ok(Json(json!(hierarchy)))
+    Ok(Json(json!(space_rooms)))
 }
