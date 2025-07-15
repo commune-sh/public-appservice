@@ -38,9 +38,9 @@ fn is_valid_localpart(localpart: &str) -> bool {
         return false;
     }
 
-    localpart.chars().all(|c| {
-        c.is_ascii_alphanumeric() || c == '.' || c == '_' || c == '=' || c == '-'
-    })
+    localpart
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '_' || c == '=' || c == '-')
 }
 
 fn is_valid_domain(domain: &str) -> bool {
@@ -71,8 +71,11 @@ fn is_valid_hostname(hostname: &str) -> bool {
         return false;
     }
 
-    if hostname.starts_with('.') || hostname.ends_with('.') 
-        || hostname.starts_with('-') || hostname.ends_with('-') {
+    if hostname.starts_with('.')
+        || hostname.ends_with('.')
+        || hostname.starts_with('-')
+        || hostname.ends_with('-')
+    {
         return false;
     }
 
@@ -83,8 +86,9 @@ fn is_valid_hostname(hostname: &str) -> bool {
             return false;
         }
 
-        if !label.chars().next().unwrap().is_ascii_alphanumeric() 
-            || !label.chars().last().unwrap().is_ascii_alphanumeric() {
+        if !label.chars().next().unwrap().is_ascii_alphanumeric()
+            || !label.chars().last().unwrap().is_ascii_alphanumeric()
+        {
             return false;
         }
 

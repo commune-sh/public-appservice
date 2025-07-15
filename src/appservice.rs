@@ -265,13 +265,13 @@ impl AppService {
                         let _permit = sem.acquire().await.ok()?;
 
                         let alias = match local_part.contains(':') && local_part.contains('.') {
-                            true =>  {
+                            true => {
                                 if local_part.starts_with('#') {
                                     local_part.to_string()
                                 } else {
                                     format!("#{local_part}")
                                 }
-                            },
+                            }
                             false => format!("#{local_part}:{server_name}"),
                         };
 
@@ -570,11 +570,9 @@ impl AppService {
                             Some(content.topic.to_string())
                         };
                     }
-                },
+                }
                 "commune.room.type" => {
-                    if let Ok(Some(content)) =
-                        state_event.get_field::<CommuneRoomType>("content")
-                    {
+                    if let Ok(Some(content)) = state_event.get_field::<CommuneRoomType>("content") {
                         match content.room_type.map(|t| t.to_string()) {
                             Some(t) if t == "chat" => room_info.room_type = RoomType::Chat,
                             Some(t) if t == "forum" => room_info.room_type = RoomType::Forum,
@@ -605,7 +603,6 @@ impl AppService {
         &self,
         room_id: OwnedRoomId,
     ) -> Result<Vec<RoomSummary>, anyhow::Error> {
-
         let mut hierarchy = self
             .client
             .send_request(get_hierarchy::v1::Request::new(room_id.clone()))
@@ -618,16 +615,20 @@ impl AppService {
 
         // build room summaries for each room in the hierarchy
         let semaphore = Arc::new(Semaphore::new(10));
-        let room_futures: Vec<_> = hierarchy.rooms.into_iter().map(|room| {
-            let sem = semaphore.clone();
-            let self_ref = self.clone();
-            async move {
-                let _permit = sem.acquire().await.ok()?;
+        let room_futures: Vec<_> = hierarchy
+            .rooms
+            .into_iter()
+            .map(|room| {
+                let sem = semaphore.clone();
+                let self_ref = self.clone();
+                async move {
+                    let _permit = sem.acquire().await.ok()?;
 
-                let summary = self_ref.get_room_summary(room.room_id).await.ok()?;
-                Some(summary)
-            }
-        }).collect();
+                    let summary = self_ref.get_room_summary(room.room_id).await.ok()?;
+                    Some(summary)
+                }
+            })
+            .collect();
 
         let results = join_all(room_futures).await;
         for result in results.into_iter().flatten() {
@@ -636,7 +637,6 @@ impl AppService {
 
         Ok(room_summaries)
     }
-
 
     pub async fn get_public_spaces(&self) -> Result<Option<Vec<RoomSummary>>, anyhow::Error> {
         let semaphore = Arc::new(Semaphore::new(10));
@@ -697,13 +697,13 @@ impl AppService {
                     let _permit = sem.acquire().await.ok()?;
 
                     let alias = match space.contains(':') && space.contains('.') {
-                        true =>  {
+                        true => {
                             if space.starts_with('#') {
                                 space.to_string()
                             } else {
                                 format!("#{space}")
                             }
-                        },
+                        }
                         false => format!("#{space}:{server_name}"),
                     };
 
@@ -746,6 +746,5 @@ pub enum RoomType {
     #[serde(rename = "chat")]
     Chat,
     #[serde(rename = "forum")]
-    Forum
+    Forum,
 }
-

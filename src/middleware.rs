@@ -14,7 +14,7 @@ use serde_json::{Value, json};
 use std::sync::Arc;
 
 use crate::AppState;
-use crate::utils::{room_alias_like, is_valid_room_id};
+use crate::utils::{is_valid_room_id, room_alias_like};
 
 use crate::error::AppserviceError;
 

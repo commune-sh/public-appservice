@@ -75,7 +75,7 @@ pub async fn matrix_proxy(
     let cache_ttl = match data.proxy_request_type {
         ProxyRequestType::RoomState => state.config.cache.room_state.ttl,
         ProxyRequestType::Messages => state.config.cache.messages.ttl,
-        ProxyRequestType::Media => 0, 
+        ProxyRequestType::Media => 0,
         ProxyRequestType::Other => state.config.cache.requests.ttl,
     };
 
