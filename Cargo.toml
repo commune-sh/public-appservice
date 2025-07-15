@@ -1,6 +1,6 @@
 [package]
 name = "public-appservice"
-version = "0.2.2"
+version = "0.2.3"
 description = "An appservice to make Matrix spaces publicly accessible."
 license = "AGPL-3.0"
 authors = ["ChurchOfTheSubgenius <mail@hummingbard.com>"]
