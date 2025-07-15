@@ -14,7 +14,7 @@ use serde_json::{Value, json};
 use std::sync::Arc;
 
 use crate::AppState;
-use crate::utils::{room_alias_like, room_id_valid};
+use crate::utils::{room_alias_like, is_valid_room_id};
 
 use crate::error::AppserviceError;
 
@@ -134,7 +134,7 @@ pub async fn validate_room_id(
     };
 
     // This is a valid room_id, so move on
-    if room_id_valid(&room_id, &server_name).is_ok() {
+    if is_valid_room_id(&room_id) {
         req.extensions_mut().insert(data);
         return Ok(next.run(req).await);
     }
