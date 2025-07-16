@@ -29,7 +29,7 @@ use anyhow;
 
 use serde::{Deserialize, Serialize};
 
-pub type HttpClient = ruma::client::http_client::HyperNativeTls;
+pub type HttpClient = ruma_client::http_client::Reqwest;
 
 use std::sync::Mutex;
 
@@ -54,10 +54,15 @@ pub struct JoinedRoomState {
 
 impl AppService {
     pub async fn new(config: &Config) -> Result<Self, anyhow::Error> {
-        let client = ruma::Client::builder()
+
+        let reqwest_client = ruma_client::http_client::Reqwest::builder()
+            .user_agent("commune-public-appservice")
+            .build()?;
+
+        let client = ruma_client::Client::builder()
             .homeserver_url(config.matrix.homeserver.clone())
             .access_token(Some(config.appservice.access_token.clone()))
-            .build::<HttpClient>()
+            .http_client(reqwest_client)
             .await?;
 
         let user_id = UserId::parse(format!(
