@@ -3,9 +3,12 @@ use axum::{Json, extract::State, http::StatusCode};
 use ruma::events::room::{
     history_visibility::{HistoryVisibility, RoomHistoryVisibilityEvent},
     member::{MembershipState, RoomMemberEvent},
+    message::RoomMessageEvent,
 };
 use ruma::events::space::child::SpaceChildEvent;
 use std::time::Duration;
+
+use http::Method;
 
 use ruma::events::macros::EventContent;
 
@@ -121,6 +124,24 @@ pub async fn transactions(
             }
         };
 
+        if let Ok(event) = serde_json::from_value::<RoomMessageEvent>(event.clone()) {
+            let room_id = event.room_id().to_owned().to_string();
+            let state_copy = state.clone();
+
+            tokio::spawn(async move {
+                tracing::info!(
+                    "New message event in room {}, recaching messages...",
+                    room_id
+                );
+
+                if let Err(e) = recache_messages(state_copy, room_id).await {
+                    tracing::warn!("Failed to recache messages: {}", e);
+                } else {
+                    tracing::info!("Successfully recached messages.");
+                }
+            });
+        };
+
         let member_event =
             if let Ok(event) = serde_json::from_value::<RoomMemberEvent>(event.clone()) {
                 event
@@ -214,4 +235,42 @@ pub async fn transactions(
     }
 
     Ok(Json(json!({})))
+}
+
+pub async fn recache_messages(state: Arc<AppState>, room_id: String) -> Result<(), anyhow::Error> {
+
+    if !state.config.cache.messages.enabled {
+        tracing::info!("Message caching is disabled, skipping recache for room: {}", room_id);
+        return Ok(());
+    }
+
+    let url = format!(
+        "{}/_matrix/client/v3/rooms/{}/messages?limit=100&dir=b",
+        state.config.matrix.homeserver, room_id
+    );
+
+    let request_builder = state
+        .proxy
+        .request(Method::GET, &url)
+        .timeout(Duration::from_secs(25))
+        .bearer_auth(&state.config.appservice.access_token);
+
+    let response = request_builder.send().await?;
+
+    let body = response.bytes().await?;
+
+    let data = body.to_vec();
+
+    let key = ("proxy_request", url.as_str()).cache_key();
+    let ttl = state.config.cache.messages.ttl;
+
+    let res = state.cache.cache_data(&key, &data, ttl).await;
+
+    if let Err(e) = res {
+        tracing::warn!("Failed to cache messages for room {}: {}", room_id, e);
+    } else {
+        tracing::info!("Successfully cached messages for room: {}", room_id);
+    }
+
+    Ok(())
 }

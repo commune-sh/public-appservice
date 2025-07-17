@@ -6,11 +6,13 @@ use tokio::sync::Semaphore;
 
 use ruma::{
     OwnedEventId, OwnedRoomId, OwnedTransactionId, OwnedUserId, RoomAliasId, UserId,
+    api::Direction,
     api::client::{
         account::whoami,
         alias::get_alias,
         appservice::request_ping,
         membership::{join_room_by_id, joined_rooms, leave_room},
+        message::get_message_events,
         profile::get_profile,
         room::get_room_event,
         space::{SpaceHierarchyRoomsChunk, get_hierarchy},
@@ -54,7 +56,6 @@ pub struct JoinedRoomState {
 
 impl AppService {
     pub async fn new(config: &Config) -> Result<Self, anyhow::Error> {
-
         let reqwest_client = ruma_client::http_client::Reqwest::builder()
             .user_agent("commune-public-appservice")
             .build()?;
@@ -726,6 +727,24 @@ impl AppService {
         let spaces: Vec<_> = results.into_iter().flatten().collect();
 
         Ok(Some(spaces))
+    }
+
+    pub async fn get_room_messages(
+        &self,
+        room_id: OwnedRoomId,
+    ) -> Result<get_message_events::v3::Response, anyhow::Error> {
+        let dir = Direction::Backward;
+
+        let mut req = get_message_events::v3::Request::new(room_id, dir);
+
+        let limit =
+            ruma::UInt::try_from(100).map_err(|_| anyhow::anyhow!("Invalid limit value"))?;
+
+        req.limit = limit;
+
+        let response = self.client.send_request(req).await?;
+
+        Ok(response)
     }
 }
 
