@@ -114,6 +114,8 @@ pub struct CacheOptions {
     pub enabled: bool,
     #[serde(default = "default_cache_ttl")]
     pub ttl: u64,
+    #[serde(default = "default_cache_ttl")]
+    pub refresh_ttl: u64,
 }
 
 impl Default for CacheOptions {
@@ -121,6 +123,7 @@ impl Default for CacheOptions {
         Self {
             enabled: false,
             ttl: default_cache_ttl(),
+            refresh_ttl: default_refresh_ttl(),
         }
     }
 }
@@ -198,6 +201,10 @@ fn default_timeout_secs() -> u64 {
 
 fn default_cache_ttl() -> u64 {
     300
+}
+
+fn default_refresh_ttl() -> u64 {
+    60
 }
 
 fn default_spaces_ttl() -> u64 {

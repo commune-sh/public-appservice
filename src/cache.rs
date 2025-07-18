@@ -112,6 +112,44 @@ impl Cache {
         Ok(data)
     }
 
+    pub async fn cache_with_ttl_threshold<T>(
+        &self,
+        key: &str,
+        data: T,
+        new_ttl: u64,
+        ttl_threshold: u64,
+    ) -> Result<T, anyhow::Error>
+    where
+        T: Cacheable,
+    {
+        let mut conn = self.client.get_multiplexed_tokio_connection().await?;
+
+        let ttl_remaining: i64 = conn.ttl(key).await?;
+
+        tracing::info!("TTL remaining for key '{}': {}", key, ttl_remaining);
+
+        let should_cache = matches!(ttl_remaining, remaining if remaining < ttl_threshold as i64);
+
+        tracing::info!(
+            "Should cache: {} (TTL remaining: {}, Threshold: {})",
+            should_cache,
+            ttl_remaining,
+            ttl_threshold
+        );
+
+        if !should_cache {
+            return Err(anyhow::anyhow!(
+                "TTL remaining ({}) is greater than threshold ({}), not caching.",
+                ttl_remaining,
+                ttl_threshold
+            ));
+        }
+
+        self.cache_data(key, &data, new_ttl).await?;
+
+        Ok(data)
+    }
+
     pub async fn cache_with_key<K, T>(&self, key: K, data: &T, ttl: u64) -> Result<(), RedisError>
     where
         K: CacheKey,

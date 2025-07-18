@@ -134,7 +134,7 @@ pub async fn transactions(
                     room_id
                 );
 
-                if let Err(e) = recache_messages(state_copy, room_id).await {
+                if let Err(e) = refresh_messages_cache(state_copy, room_id).await {
                     tracing::warn!("Failed to recache messages: {}", e);
                 } else {
                     tracing::info!("Successfully recached messages.");
@@ -237,10 +237,15 @@ pub async fn transactions(
     Ok(Json(json!({})))
 }
 
-pub async fn recache_messages(state: Arc<AppState>, room_id: String) -> Result<(), anyhow::Error> {
-
+pub async fn refresh_messages_cache(
+    state: Arc<AppState>,
+    room_id: String,
+) -> Result<(), anyhow::Error> {
     if !state.config.cache.messages.enabled {
-        tracing::info!("Message caching is disabled, skipping recache for room: {}", room_id);
+        tracing::info!(
+            "Message caching is disabled, skipping recache for room: {}",
+            room_id
+        );
         return Ok(());
     }
 
@@ -264,7 +269,12 @@ pub async fn recache_messages(state: Arc<AppState>, room_id: String) -> Result<(
     let key = ("proxy_request", url.as_str()).cache_key();
     let ttl = state.config.cache.messages.ttl;
 
-    let res = state.cache.cache_data(&key, &data, ttl).await;
+    let threshold: u64 = state.config.cache.messages.ttl - state.config.cache.messages.refresh_ttl;
+
+    let res = state
+        .cache
+        .cache_with_ttl_threshold::<Vec<u8>>(&key, data, ttl, threshold)
+        .await;
 
     if let Err(e) = res {
         tracing::warn!("Failed to cache messages for room {}: {}", room_id, e);

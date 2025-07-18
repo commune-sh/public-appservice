@@ -53,6 +53,7 @@ ttl = 3600
 [cache.messages]
 enabled = true
 ttl = 3600
+refresh_ttl = 60
 
 [cache.search]
 enabled = false
