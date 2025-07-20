@@ -128,7 +128,11 @@ impl Cache {
 
         tracing::info!("TTL remaining for key '{}': {}", key, ttl_remaining);
 
-        let should_cache = matches!(ttl_remaining, remaining if remaining < ttl_threshold as i64);
+        let should_cache = match ttl_remaining {
+            -2 => true,  
+            remaining if remaining < ttl_threshold as i64 => true,  
+            _ => false,  
+        };
 
         tracing::info!(
             "Should cache: {} (TTL remaining: {}, Threshold: {})",
