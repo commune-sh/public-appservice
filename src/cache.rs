@@ -118,7 +118,7 @@ impl Cache {
         data: T,
         new_ttl: u64,
         ttl_threshold: u64,
-    ) -> Result<T, anyhow::Error>
+    ) -> Result<(), RedisError>
     where
         T: Cacheable,
     {
@@ -129,9 +129,9 @@ impl Cache {
         tracing::info!("TTL remaining for key '{}': {}", key, ttl_remaining);
 
         let should_cache = match ttl_remaining {
-            -2 => true,  
-            remaining if remaining < ttl_threshold as i64 => true,  
-            _ => false,  
+            -2 => true,
+            remaining if remaining < ttl_threshold as i64 => true,
+            _ => false,
         };
 
         tracing::info!(
@@ -142,16 +142,15 @@ impl Cache {
         );
 
         if !should_cache {
-            return Err(anyhow::anyhow!(
-                "TTL remaining ({}) is greater than threshold ({}), not caching.",
-                ttl_remaining,
-                ttl_threshold
-            ));
+            return Err(RedisError::from((
+                redis::ErrorKind::ResponseError,
+                "TTL remaining is greater than threshold, not caching",
+            )));
         }
 
         self.cache_data(key, &data, new_ttl).await?;
 
-        Ok(data)
+        Ok(())
     }
 
     pub async fn cache_with_key<K, T>(&self, key: K, data: &T, ttl: u64) -> Result<(), RedisError>

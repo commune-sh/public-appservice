@@ -1,5 +1,7 @@
 use axum::{Json, extract::State, http::StatusCode};
 
+use ruma::events::AnyStateEvent;
+use ruma::events::room::redaction::RoomRedactionEvent;
 use ruma::events::room::{
     history_visibility::{HistoryVisibility, RoomHistoryVisibilityEvent},
     member::{MembershipState, RoomMemberEvent},
@@ -124,23 +126,25 @@ pub async fn transactions(
             }
         };
 
+        if let Ok(event) = serde_json::from_value::<AnyStateEvent>(event.clone()) {
+            println!("State Event: {:#?}", event);
+        };
+
+        if let Ok(event) = serde_json::from_value::<RoomRedactionEvent>(event.clone()) {
+            let room_id = event.room_id().to_owned().to_string();
+            let state = state.clone();
+            tokio::spawn(async move {
+                handle_recache(state, room_id, true).await;
+            });
+        }
+
         if let Ok(event) = serde_json::from_value::<RoomMessageEvent>(event.clone()) {
             let room_id = event.room_id().to_owned().to_string();
-            let state_copy = state.clone();
-
+            let state = state.clone();
             tokio::spawn(async move {
-                tracing::info!(
-                    "New message event in room {}, recaching messages...",
-                    room_id
-                );
-
-                if let Err(e) = refresh_messages_cache(state_copy, room_id).await {
-                    tracing::warn!("Failed to recache messages: {}", e);
-                } else {
-                    tracing::info!("Successfully recached messages.");
-                }
+                handle_recache(state, room_id, false).await;
             });
-        };
+        }
 
         let member_event =
             if let Ok(event) = serde_json::from_value::<RoomMemberEvent>(event.clone()) {
@@ -237,9 +241,23 @@ pub async fn transactions(
     Ok(Json(json!({})))
 }
 
+pub async fn handle_recache(state: Arc<AppState>, room_id: String, is_redaction: bool) {
+    tracing::info!(
+        "New message event in room {}, recaching messages...",
+        room_id
+    );
+
+    if let Err(e) = refresh_messages_cache(state, room_id, is_redaction).await {
+        tracing::warn!("Failed to recache messages: {}", e);
+    } else {
+        tracing::info!("Successfully recached messages.");
+    }
+}
+
 pub async fn refresh_messages_cache(
     state: Arc<AppState>,
     room_id: String,
+    is_redaction: bool,
 ) -> Result<(), anyhow::Error> {
     if !state.config.cache.messages.enabled {
         tracing::info!(
@@ -271,15 +289,18 @@ pub async fn refresh_messages_cache(
 
     let threshold: u64 = state.config.cache.messages.ttl - state.config.cache.messages.refresh_ttl;
 
-    let res = state
-        .cache
-        .cache_with_ttl_threshold::<Vec<u8>>(&key, data, ttl, threshold)
-        .await;
+    let res = match is_redaction {
+        true => state.cache.cache_data::<Vec<u8>>(&key, &data, ttl).await,
+        false => {
+            state
+                .cache
+                .cache_with_ttl_threshold::<Vec<u8>>(&key, data, ttl, threshold)
+                .await
+        }
+    };
 
     if let Err(e) = res {
         tracing::warn!("Failed to cache messages for room {}: {}", room_id, e);
-    } else {
-        tracing::info!("Successfully cached messages for room: {}", room_id);
     }
 
     Ok(())
