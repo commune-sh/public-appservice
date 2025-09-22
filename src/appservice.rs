@@ -16,7 +16,7 @@ use ruma::{
         profile::get_profile,
         room::get_room_event,
         space::{SpaceHierarchyRoomsChunk, get_hierarchy},
-        state::{get_state_events, get_state_events_for_key},
+        state::{get_state_events, get_state_event_for_key},
     },
     events::{
         AnyStateEvent, AnyTimelineEvent, StateEventType,
@@ -39,7 +39,7 @@ use crate::rooms::CommuneRoomType;
 
 #[derive(Clone)]
 pub struct AppService {
-    client: ruma::Client<HttpClient>,
+    client: ruma_client::Client<HttpClient>,
     config: Config,
     pub appservice_id: String,
     pub user_id: Box<OwnedUserId>,
@@ -56,6 +56,7 @@ pub struct JoinedRoomState {
 
 impl AppService {
     pub async fn new(config: &Config) -> Result<Self, anyhow::Error> {
+
         let reqwest_client = ruma_client::http_client::Reqwest::builder()
             .user_agent("commune-public-appservice")
             .build()?;
@@ -65,6 +66,7 @@ impl AppService {
             .access_token(Some(config.appservice.access_token.clone()))
             .http_client(reqwest_client)
             .await?;
+
 
         let user_id = UserId::parse(format!(
             "@{}:{}",
@@ -78,7 +80,10 @@ impl AppService {
             return Err(anyhow::anyhow!(
                 "Failed to authenticate with homeserver. Check your appservice access token."
             ));
-        }
+        
+        } else {
+            println!("Successfully authenticated {:?}", whoami);
+        };
 
         let joined_rooms = match client.send_request(joined_rooms::v3::Request::new()).await {
             Ok(r) => r.joined_rooms,
@@ -167,16 +172,21 @@ impl AppService {
     }
 
     pub async fn has_joined_room(&self, room_id: &OwnedRoomId) -> Result<bool, anyhow::Error> {
+
+        let mut req = get_state_event_for_key::v3::Request::new(
+            room_id.clone(),
+            StateEventType::RoomMember,
+            self.user_id()
+        );
+
+        req.format = get_state_event_for_key::v3::StateEventFormat::Content;
+
         let jr = self
             .client
-            .send_request(get_state_events_for_key::v3::Request::new(
-                room_id.clone(),
-                StateEventType::RoomMember,
-                self.user_id(),
-            ))
+            .send_request(req)
             .await?;
 
-        let membership = jr.content.get_field::<String>("membership")?;
+        let membership = jr.into_content().get_field::<String>("membership")?;
 
         Ok(membership == Some("join".to_string()))
     }
@@ -211,14 +221,14 @@ impl AppService {
         tracing::info!("Hierarchy rooms: {:#?}", hierarchy.rooms.len());
 
         for room in hierarchy.rooms {
-            if room.room_id == *room_id {
+            if room.summary.room_id == *room_id {
                 continue;
             }
             let left = self
                 .client
-                .send_request(leave_room::v3::Request::new(room.room_id.clone()))
+                .send_request(leave_room::v3::Request::new(room.summary.room_id.clone()))
                 .await?;
-            tracing::info!("Left child room: {:#?}", room.room_id);
+            tracing::info!("Left child room: {:#?}", room.summary.room_id);
             tracing::info!("Left child room: {:#?}", left);
         }
 
@@ -292,7 +302,7 @@ impl AppService {
                             .ok()?;
 
                         let mut room_ids = vec![room_id];
-                        room_ids.extend(hierarchy.rooms.into_iter().map(|room| room.room_id));
+                        room_ids.extend(hierarchy.rooms.into_iter().map(|room| room.summary.room_id));
 
                         Some(room_ids)
                     }
@@ -416,17 +426,17 @@ impl AppService {
 
                 for room in hierarchy.rooms {
                     let mut jrs = JoinedRoomState {
-                        room_id: room.room_id.clone(),
+                        room_id: room.summary.room_id.clone(),
                         state: None,
                     };
                     let st = self
                         .client
-                        .send_request(get_state_events::v3::Request::new(room.room_id.clone()))
+                        .send_request(get_state_events::v3::Request::new(room.summary.room_id.clone()))
                         .await?;
 
                     jrs.state = Some(st.room_state);
 
-                    let exists = joined_rooms.iter().any(|r| r.room_id == room.room_id);
+                    let exists = joined_rooms.iter().any(|r| r.room_id == room.summary.room_id);
                     if !exists {
                         joined_rooms.push(jrs);
                     }
@@ -617,7 +627,7 @@ impl AppService {
         let mut room_summaries: Vec<RoomSummary> = Vec::new();
 
         //remove the room itself from the hierarchy
-        hierarchy.rooms.retain(|room| room.room_id != room_id);
+        hierarchy.rooms.retain(|room| room.summary.room_id != room_id);
 
         // build room summaries for each room in the hierarchy
         let semaphore = Arc::new(Semaphore::new(10));
@@ -630,7 +640,7 @@ impl AppService {
                 async move {
                     let _permit = sem.acquire().await.ok()?;
 
-                    let summary = self_ref.get_room_summary(room.room_id).await.ok()?;
+                    let summary = self_ref.get_room_summary(room.summary.room_id).await.ok()?;
                     Some(summary)
                 }
             })

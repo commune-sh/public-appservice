@@ -6,13 +6,13 @@ use axum::{
 };
 
 use ruma::{
-    EventId, MilliSecondsSinceUnixEpoch, OwnedMxcUri, RoomId,
+    EventId, MilliSecondsSinceUnixEpoch, RoomId,
     events::{
         AnyTimelineEvent,
         room::{
             avatar::RoomAvatarEventContent,
             canonical_alias::RoomCanonicalAliasEventContent,
-            create::{RoomCreateEvent, RoomCreateEventContent},
+            create::RoomCreateEventContent,
             history_visibility::RoomHistoryVisibilityEventContent,
             join_rules::{JoinRule, RoomJoinRulesEventContent},
             name::RoomNameEventContent,
@@ -144,10 +144,16 @@ fn process_rooms(_state: Arc<AppState>, rooms: Vec<JoinedRoomState>) -> Vec<Publ
             };
 
             if event_type == "m.room.create" {
-                if let Ok(event) = state_event.deserialize_as::<RoomCreateEvent>() {
-                    pub_room.origin_server_ts = Some(event.origin_server_ts());
-                    pub_room.sender = Some(event.sender().to_string());
-                }
+
+                if let Ok(Some(osts)) = state_event.get_field::<MilliSecondsSinceUnixEpoch>("origin_server_ts")
+                {
+                    pub_room.origin_server_ts = Some(osts);
+                };
+
+                if let Ok(Some(sender)) = state_event.get_field::<String>("sender")
+                {
+                    pub_room.sender = Some(sender.to_string());
+                };
 
                 if let Ok(Some(content)) =
                     state_event.get_field::<RoomCreateEventContent>("content")
@@ -356,7 +362,7 @@ pub struct RoomInfo {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Sender {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub avatar_url: Option<OwnedMxcUri>,
+    pub avatar_url: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub displayname: Option<String>,
 }
@@ -405,11 +411,11 @@ pub async fn room_info(
             })?;
 
         for room in hierarchy {
-            if let Some(name) = room.name.as_ref() {
+            if let Some(name) = room.summary.name.as_ref() {
                 let slug = utils::slugify(name);
 
                 if slug == alias {
-                    parsed_id = room.room_id.clone();
+                    parsed_id = room.summary.room_id.clone();
 
                     let summary = state
                         .appservice
@@ -456,9 +462,12 @@ pub async fn room_info(
                 AppserviceError::MatrixError("Failed to fetch sender profile".to_string())
             })?;
 
+            let avatar_url = profile.get("avatar_url").and_then(|v| v.as_str()).map(|s| s.to_string());
+            let displayname = profile.get("displayname").and_then(|v| v.as_str()).map(|s| s.to_string());
+
             info.sender = Some(Sender {
-                avatar_url: profile.avatar_url,
-                displayname: profile.displayname,
+                avatar_url: avatar_url,
+                displayname: displayname,
             });
         }
     }
