@@ -26,7 +26,7 @@ use crate::config::Config;
 use crate::middleware::{
     add_data, authenticate_homeserver, is_admin, validate_public_room, validate_room_id,
 };
-use crate::rooms::{join_room, leave_room, public_rooms, room_info};
+use crate::rooms::{join_room, leave_room, public_rooms, room_info, room_events};
 
 use crate::ping::ping;
 
@@ -115,6 +115,10 @@ impl Server {
             .route(
                 "/_matrix/client/v1/rooms/{room_id}/threads",
                 get(matrix_proxy),
+            )
+            .route(
+                "/_matrix/client/v1/rooms/{room_id}/events",
+                get(room_events),
             )
             .route(
                 "/_matrix/client/v1/rooms/{room_id}/relations/{*path}",
