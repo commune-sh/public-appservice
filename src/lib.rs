@@ -11,6 +11,7 @@ pub mod rooms;
 pub mod server;
 pub mod space;
 pub mod utils;
+pub mod board;
 
 use std::sync::Arc;
 use std::time::Duration;

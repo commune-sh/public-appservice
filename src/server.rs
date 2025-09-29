@@ -28,6 +28,8 @@ use crate::middleware::{
 };
 use crate::rooms::{join_room, leave_room, public_rooms, room_info};
 
+use crate::board::board_events;
+
 use crate::ping::ping;
 
 use crate::api::transactions;
@@ -115,6 +117,10 @@ impl Server {
             .route(
                 "/_matrix/client/v1/rooms/{room_id}/threads",
                 get(matrix_proxy),
+            )
+            .route(
+                "/_matrix/client/v1/rooms/{room_id}/events",
+                get(board_events),
             )
             .route(
                 "/_matrix/client/v1/rooms/{room_id}/relations/{*path}",
