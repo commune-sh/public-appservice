@@ -114,6 +114,8 @@ You can also install it with `cargo install public-appservice` and run it with `
 
 Additionally, you can run the server in a container with `docker compose up -v`.
 
+Binaries are also available on the [releases](https://github.com/commune-sh/public-appservice/releases) page.
+
 #### Deploying
 
 For simplicity, run this appservice on the same host where the matrix homeserver lives, although it isn't necessary. There are example docs for both a systemd unit and nginx reverse proxy in the [`/docs`](https://github.com/commune-sh/appservice/tree/main/docs).
@@ -132,4 +134,5 @@ This project is funded through [NGI0 Entrust](https://nlnet.nl/entrust), a fund 
 
 [<img src="https://nlnet.nl/logo/banner.png" alt="NLnet foundation logo" width="20%" />](https://nlnet.nl)
 [<img src="https://nlnet.nl/image/logos/NGI0_tag.svg" alt="NGI Zero Logo" width="20%" />](https://nlnet.nl/entrust)
+
 
